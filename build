@@ -1,0 +1,20 @@
+#!/bin/zsh
+
+export GREP_COLORS='ms=101:mc=01;31:sl=:cx=:fn=35:ln=32:bn=32:se=36'
+vfiles=(utils.v presburger.v LRA.v VASs.v)
+error=
+
+puterr(){
+  echo $1 >&2
+  error=1
+}
+
+for f in $vfiles; do
+  tail -c 1 $f | grep -q . && puterr "$f: no newline at end of file"
+  tail -n 1 $f | grep -qv . && puterr "$f: trailing empty line"
+  grep --color=auto -H -n " * $" $f && error=1
+done
+
+[[ -n $error ]] && exit 1
+
+make -j ${JOBS:-4} VFILES="$vfiles" COQLIBS="-R . '' -R ~/src/coq/regular/ '' -R ~/src/coq/finmap/ '' $COQLIB"
