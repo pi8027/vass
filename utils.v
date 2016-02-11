@@ -86,58 +86,62 @@ Section algebra_ext.
 Variable (R : numDomainType).
 
 Definition lter b : rel R :=
-  if b then Num.Def.ltr else Num.Def.ler.
+  if b then Num.Def.ler else Num.Def.ltr.
 
 Lemma lterE b r1 r2 :
-  lter b r1 r2 = (if b then (r1 < r2)%R else (r1 <= r2)%R).
-Proof. by rewrite /lter; case: ifP. Qed.
+  lter b r1 r2 = (if b then (r1 <= r2)%R else (r1 < r2)%R).
+Proof. by rewrite /lter; case: b. Qed.
 
-Lemma lter_inv b r1 r2 : lter b r1 r2 = lter b (- r2)%R (- r1)%R.
-Proof. by case: b => /=; rewrite (ltr_oppl, ler_oppl) opprK. Qed.
+Lemma lternE b r1 r2 :
+  lter (~~ b) r1 r2 = (if b then (r1 < r2)%R else (r1 <= r2)%R).
+Proof. by rewrite /lter; case: b. Qed.
 
-Lemma subr_let0r b (x y : R) : lter b 0%R (y - x)%R = lter b x y.
+Lemma lter_opp2 b : {mono -%R%R : x y /~ lter b x y}.
+Proof. by case: b => /= x y; rewrite (ltr_oppl, ler_oppl) opprK. Qed.
+
+Lemma subr_lte0r b (x y : R) : lter b 0%R (y - x)%R = lter b x y.
 Proof. by case: b => /=; rewrite (subr_ge0, subr_gt0). Qed.
 
-Lemma addr_let0r b (x y : R) : lter b 0%R (x + y)%R = lter b (- x)%R y.
-Proof. by rewrite addrC -{1}(opprK x) subr_let0r. Qed.
+Lemma addr_lte0r b (x y : R) : lter b 0%R (x + y)%R = lter b (- x)%R y.
+Proof. by rewrite addrC -{1}(opprK x) subr_lte0r. Qed.
 
 Lemma lter_trans b1 b2 r1 r2 r3 :
-  lter b1 r1 r2 -> lter b2 r2 r3 -> lter (b1 || b2) r1 r3.
+  lter b1 r1 r2 -> lter b2 r2 r3 -> lter (b1 && b2) r1 r3.
 Proof.
   case: b1; case: b2 => /=.
-  apply ltr_trans. apply ltr_le_trans. apply ler_lt_trans. apply ler_trans.
+  apply ler_trans. apply ler_lt_trans. apply ltr_le_trans. apply ltr_trans.
 Qed.
 
 Lemma lter_andb b1 b2 r1 r2 :
-  lter (b1 && b2) r1 r2 = lter b1 r1 r2 || lter b2 r1 r2.
+  lter (b1 && b2) r1 r2 = lter b1 r1 r2 && lter b2 r1 r2.
+Proof.
+  by case: b1; case: b2 => /=; rewrite ?ler_eqVlt;
+    case: (_ < _)%R; rewrite ?(orbT, orbF, andbF, andbb).
+Qed.
+
+Lemma lter_orb b1 b2 r1 r2 :
+  lter (b1 || b2) r1 r2 = lter b1 r1 r2 || lter b2 r1 r2.
 Proof.
   by case: b1; case: b2 => /=; rewrite ?ler_eqVlt;
     case: (_ < _)%R; rewrite ?(orbT, orbF, orbb).
 Qed.
 
-Lemma lter_orb b1 b2 r1 r2 :
-  lter (b1 || b2) r1 r2 = lter b1 r1 r2 && lter b2 r1 r2.
-Proof.
-  by case: b1; case: b2 => /=; rewrite ?ler_eqVlt;
-    case: (_ < _)%R; rewrite ?(orbT, andbF, andbb).
-Qed.
-
-Lemma lter_imply b1 b2 r1 r2 : b2 ==> b1 -> lter b1 r1 r2 -> lter b2 r1 r2.
+Lemma lter_imply b1 b2 r1 r2 : b1 ==> b2 -> lter b1 r1 r2 -> lter b2 r1 r2.
 Proof.
   by case: b1; case: b2 => //= _; rewrite ler_eqVlt => ->; rewrite orbT.
 Qed.
 
 Lemma lter_pmul2l b x : (0 < x)%R -> {mono *%R x : y z / lter b y z}.
-Proof. case: b => /= H. apply (ltr_pmul2l H). apply (ler_pmul2l H). Qed.
+Proof. by case: b => /= H y z; rewrite lter_pmul2l. Qed.
 
 Lemma lter_pmul2r b x : (0 < x)%R -> {mono *%R^~ x : y z / lter b y z}.
-Proof. case: b => /= H. apply (ltr_pmul2r H). apply (ler_pmul2r H). Qed.
+Proof. by case: b => /= H y z; rewrite lter_pmul2r. Qed.
 
 Lemma lter_nmul2l b x : (x < 0)%R -> {mono *%R x : y z /~ lter b y z}.
-Proof. case: b => /= H. apply (ltr_nmul2l H). apply (ler_nmul2l H). Qed.
+Proof. by case: b => /= H y z; rewrite lter_nmul2l. Qed.
 
 Lemma lter_nmul2r b x : (x < 0)%R -> {mono *%R^~ x : y z /~ lter b y z}.
-Proof. case: b => /= H. apply (ltr_nmul2r H). apply (ler_nmul2r H). Qed.
+Proof. by case: b => /= H y z; rewrite lter_nmul2r. Qed.
 
 (*
 Lemma lter_wpmul2l b x : (0 < x)%R -> {homo *%R x : y z / lter b y z}.
@@ -323,7 +327,7 @@ Proof. by case => -[lb lr |] [ub ur |] => //=; rewrite !eqxx !implybb. Qed.
 Definition itv_isnot0 (i : interval) :=
   let: Interval l u := i in
   match l, u with
-    | BOpen_if lb lr, BOpen_if ub ur => lter (lb || ub) lr ur
+    | BOpen_if lb lr, BOpen_if ub ur => lter (~~ (lb || ub)) lr ur
     | _, _ => true
   end.
 
@@ -352,15 +356,16 @@ Lemma itv_isnot0P (R : numFieldType) (i : interval R) :
   reflect (exists x, x \in i) (itv_isnot0 i).
 Proof.
   move: i => [] [lb lr |] [ub ur |] /=; apply (iffP idP) => //.
-  - move => H; exists ((lr + ur) / 2%:R)%R; rewrite inE -!lterE.
+  - move => H; exists ((lr + ur) / 2%:R)%R; rewrite inE -!lternE.
     by rewrite lter_pdivr_mulr ?lter_pdivl_mulr ?pmulrn_lgt0 ?ltr01 //
-               !mulrnAr !mulr1 /GRing.natmul lter_add2l lter_add2r -lter_orb.
-  - by case => x; rewrite inE -!lterE => /andP [H H0]; apply (lter_trans H H0).
+               !mulrnAr !mulr1 /GRing.natmul lter_add2l lter_add2r
+               -lter_andb -negb_or.
+  - by case => x; rewrite inE -!lternE negb_or => /andP []; apply lter_trans.
   - move => _; exists (lr + 1)%R;
-      rewrite inE -lterE andbT -{1}(addr0 lr) lter_add2l.
+      rewrite inE -lternE andbT -{1}(addr0 lr) lter_add2l.
     by case: lb => //=; rewrite (ltr01, ler01).
   - move => _; exists (ur - 1)%R;
-      rewrite inE -lterE -{2}(subr0 ur) lter_add2l -lter_inv /=.
+      rewrite inE -lternE -{2}(subr0 ur) lter_add2l lter_opp2 /=.
     by case: ub => //=; rewrite (ltr01, ler01).
   - by move => _; exists 0%R; rewrite inE.
 Qed.

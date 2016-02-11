@@ -7,14 +7,16 @@ From mathcomp Require Import all_ssreflect all_algebra.
 Require Import utils automata.
 Import GRing.Theory Num.Theory.
 
+(******************************************************************************)
+(*  Presburger arithmetic                                                     *)
+(******************************************************************************)
+
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Set Printing Width 78.
-
-Lemma max_div (I : finType) f d :
-  \max_(i : I) f i %/ d = (\max_(i : I) f i) %/ d.
+Lemma max_div (T : Type) (I : seq T) f d :
+  \max_(i <- I) f i %/ d = (\max_(i <- I) f i) %/ d.
 Proof.
   rewrite (big_endo (fun x => x %/ d)) //; last by rewrite div0n.
   by move => x y; case: (leqP x y);
@@ -640,3 +642,6 @@ Proof.
     by move/presburger_dec_wP: (H (assign_of_word w));
       rewrite /presburger_dec_w delta_accept.
 Qed.
+
+Extraction Language Ocaml.
+Extraction "presburger_8.5.ml" presburger_dec presburger_sat presburger_valid.

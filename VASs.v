@@ -2,6 +2,10 @@ Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import all_ssreflect all_algebra.
 Import GRing.Theory Num.Theory.
 
+(******************************************************************************)
+(*  Vector addition systems                                                   *)
+(******************************************************************************)
+
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.

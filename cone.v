@@ -3,6 +3,10 @@ From mathcomp Require Import all_ssreflect all_algebra.
 Require Import LRA.
 Import GRing.Theory Num.Theory.
 
+(******************************************************************************)
+(*  Convex cones                                                              *)
+(******************************************************************************)
+
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -53,26 +57,6 @@ Definition norm_inf (x : 'cV[rat]_d) :=
 Definition closure (X : 'cV[rat]_d -> Prop) (x : 'cV_d) :=
   forall e : rat, exists y : 'cV_d, (norm_inf (x + y) < e)%R.
 
-Lemma Farkas m n (A : 'M[rat]_(m, n)) (b : 'cV[rat]_m) :
-  (exists2 x : 'cV[rat]_n, A *m x = b & pos_cV x)%R \/
-  ().
-
-Lemma duality_direct C :
-  conic_set_fg C ->
-  exists H : seq (rat ^ dim), forall x : rat ^ dim,
-     C x <-> all (fun h => 0 <= )%R H).
-
-Lemma duality_converse C :
-  conic_set C ->
-  (exists H : seq (rat ^ dim), forall x : rat ^ dim,
-      C x <-> all (fun h => 0 <= )%R H) ->
-  conic_set_fg C.
 
 
-
-
-(*
 End rational.
-
-********************************************************************************
-*)

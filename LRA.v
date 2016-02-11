@@ -3,6 +3,10 @@ From mathcomp Require Import all_ssreflect all_algebra.
 Import GRing.Theory Num.Theory.
 Require Import utils.
 
+(******************************************************************************)
+(*  Linear rational arithmetic and Fourier-Motzkin variable elimination       *)
+(******************************************************************************)
+
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -184,7 +188,7 @@ Lemma NF_neg_CNF dim (I : rat ^ dim) lss :
 Proof.
   rewrite /NF_neg /LRA_interpret_literal -has_predC has_map.
   apply eq_in_has => /= afs _; rewrite -all_predC all_map.
-  apply eq_in_all => -[f t] _ /=; rewrite lter_inv lterN oppr0.
+  apply eq_in_all => -[f t] _ /=; rewrite lterN -lter_opp2 oppr0.
   congr lter; rewrite /LRA_interpret_af big_endo //; last apply opprD.
   by apply eq_bigr => i _; rewrite ffunE mulrNz mulNr opprK.
 Qed.
@@ -195,7 +199,7 @@ Lemma NF_neg_DNF dim (I : rat ^ dim) lss :
 Proof.
   rewrite /NF_neg /LRA_interpret_literal -all_predC all_map.
   apply eq_in_all => /= afs _; rewrite -has_predC has_map.
-  apply eq_in_has => -[f t] _ /=; rewrite lter_inv lterN oppr0.
+  apply eq_in_has => -[f t] _ /=; rewrite lterN -lter_opp2 oppr0.
   congr lter; rewrite /LRA_interpret_af big_endo //; last apply opprD.
   by apply eq_bigr => i _; rewrite ffunE mulrNz mulNr opprK.
 Qed.
@@ -208,7 +212,7 @@ Fixpoint
       [seq fs1 ++ fs2 | fs1 <- QFLRA_DNF f1, fs2 <- QFLRA_DNF f2]
     | QFLRA_or f1 f2 => QFLRA_DNF f1 ++ QFLRA_DNF f2
     | QFLRA_imply f1 f2 => NF_neg (QFLRA_CNF f1) ++ QFLRA_DNF f2
-    | QFLRA_leq f' => [:: [:: (false, f')]]
+    | QFLRA_leq f' => [:: [:: (true, f')]]
   end with
   QFLRA_CNF dim (f : QFLRA_formula dim) : seq (seq (LRA_literal dim)) :=
   match f with
@@ -218,7 +222,7 @@ Fixpoint
       [seq fs1 ++ fs2 | fs1 <- QFLRA_CNF f1, fs2 <- QFLRA_CNF f2]
     | QFLRA_imply f1 f2 =>
       [seq fs1 ++ fs2 | fs1 <- NF_neg (QFLRA_DNF f1), fs2 <- QFLRA_CNF f2]
-    | QFLRA_leq f' => [:: [:: (false, f')]]
+    | QFLRA_leq f' => [:: [:: (true, f')]]
   end.
 
 Lemma QFLRA_NF_correctness dim (I : rat ^ dim) (f : QFLRA_formula dim) :
@@ -259,7 +263,7 @@ Lemma QFLRA_CNF_correctness dim (I : rat ^ dim) (f : QFLRA_formula dim) :
 Proof. by case: (QFLRA_NF_correctness I f). Qed.
 
 Definition QFLRA_l2f dim (l : LRA_literal dim) :=
-  if l.1 then QFLRA_neg (QFLRA_leq (- l.2)%R) else QFLRA_leq l.2.
+  if l.1 then QFLRA_leq l.2 else QFLRA_neg (QFLRA_leq (- l.2)%R).
 
 Lemma QFLRA_l2f_correctness dim (I : rat ^ dim) (l : LRA_literal dim) :
   LRA_interpret_literal I l = QFLRA_interpret_formula I (QFLRA_l2f l).
@@ -294,7 +298,7 @@ Definition exists_conj_elim
     (* - b_0 x_0 <<= b_1 x_1 + ... + b_n x_n *)
   [seq (l.1, tail_tuple l.2)
     | l : LRA_literal dim.+1 <- ls & l.2 ord0 == 0%R] ++
-  [seq (lp.1 || ln.1, lp.2 ord0 *: tail_tuple ln.2 -
+  [seq (lp.1 && ln.1, lp.2 ord0 *: tail_tuple ln.2 -
                       ln.2 ord0 *: tail_tuple lp.2)%R
     | lp : LRA_literal dim.+1 <- lsp, ln : LRA_literal dim.+1 <- lsn]
   (*
@@ -308,25 +312,20 @@ Definition literal_interval dim (I : rat ^ dim) (l : LRA_literal dim.+1) :=
   let r := (- LRA_interpret_af I (tail_tuple l.2) / (l.2 ord0)%:~R)%R in
   if l.2 ord0 == 0
   then if LRA_interpret_literal I (l.1, tail_tuple l.2) then itv1 else itv0
-  else if (0 < l.2 ord0)%R then Interval (BOpen_if l.1 r) (BInfty _)
-                           else Interval (BInfty _) (BOpen_if l.1 r).
+  else if (0 < l.2 ord0)%R then Interval (BOpen_if (~~ l.1) r) (BInfty _)
+                           else Interval (BInfty _) (BOpen_if (~~ l.1) r).
 
 Lemma literal_intervalE dim x0 (I : rat ^ dim) (l : LRA_literal dim.+1) :
   LRA_interpret_literal (cons_tuple x0 I) l = (x0 \in literal_interval I l).
 Proof.
-  rewrite /literal_interval.
-  case: ifP; last (case: ltrP; rewrite inE /= -?lterE ?andbT).
-  - move/eqP => H.
-    rewrite /LRA_interpret_literal LRA_af_recl
-            H rat0 mul0r add0r tail_cons_tuple /=.
-    by case: (lter l.1 _ _);
-       rewrite -(negbK (_ \in _)) ?(itv1E, itv0E).
-  - move => H _.
-    by rewrite /LRA_interpret_literal LRA_af_recl cons_tuple_eq1 tail_cons_tuple
-               addrC addr_let0r lter_pdivr_mulr (mulrC, pmulrz_lgt0).
-  - move => H H0; move: H; rewrite ler_eqVlt {}H0 /= => H.
-    by rewrite /LRA_interpret_literal LRA_af_recl cons_tuple_eq1 tail_cons_tuple
-               addrC addr_let0r lter_ndivl_mulr (mulrC, nmulrz_llt0).
+  rewrite /literal_interval /LRA_interpret_literal.
+  case: (ltrgtP (l.2 ord0) 0%R) => /= H;
+    try by rewrite
+             inE /= ?andbT LRA_af_recl cons_tuple_eq1 tail_cons_tuple
+             addrC -lternE negbK addr_lte0r (lter_ndivl_mulr, lter_pdivr_mulr)
+             (mulrC, nmulrz_llt0, pmulrz_lgt0).
+  rewrite LRA_af_recl H rat0 mul0r add0r tail_cons_tuple.
+  by case: (lter l.1 _ _); rewrite -(negbK (_ \in _)) ?(itv1E, itv0E).
 Qed.
 
 Lemma exists_conj_elimP' dim x I (ls : seq (LRA_literal dim.+1)) :
@@ -370,19 +369,19 @@ Proof.
       (case_eq (l2.2 ord0 == 0) => H5;
        first rewrite (H1 l2) // ?itv_intersectioni1 {H5});
       rewrite /literal_interval ?H4 ?H5;
-      do !case: ifP => //=; move => H6 H7.
+      do !case: ifP => //=; move => H6 H7; try rewrite -negb_and negbK.
     + have {H4 H5 H6} H4: (l2.2 ord0 < 0)%R
         by rewrite ltrNge ler_eqVlt eq_sym H5 H6.
       move: (H0 l1 l2).
       by rewrite !mem_filter H2 H3 H4 H7 /LRA_interpret_literal /=
                  lter_pdivr_mulr (ltr0z, mulrAC) // lter_ndivl_mulr ?ltrz0 //
-                 !mulNr -addr_let0r af_decomp !(mulrC _%:~R%R) => ->.
+                 !mulNr -addr_lte0r af_decomp !(mulrC _%:~R%R) => ->.
     + have {H4 H5 H7} H4: (l1.2 ord0 < 0)%R
         by rewrite ltrNge ler_eqVlt eq_sym H4 H7.
       move: (H0 l2 l1).
       by rewrite !mem_filter H2 H3 H4 H6 /LRA_interpret_literal /=
                  lter_pdivr_mulr (ltr0z, mulrAC) // lter_ndivl_mulr ?ltrz0 //
-                 !mulNr -addr_let0r af_decomp !(mulrC _%:~R%R) => ->.
+                 !mulNr -addr_lte0r af_decomp !(mulrC _%:~R%R) => ->.
   - case => x H; apply/andP; split.
     + rewrite all_map; apply/allP => /= l; rewrite mem_filter =>
         /andP [/eqP H0 /(allP H)].
@@ -393,8 +392,8 @@ Proof.
                                  /andP [H2] /(allP H) H3 ->.
       move: H0 H2 H1 H3.
       rewrite /LRA_interpret_literal /= !LRA_af_recl
-              cons_tuple_eq1 tail_cons_tuple !addr_let0r
-              -!(ltr_int [numDomainType of rat]) !rat0 af_decomp subr_let0r.
+              cons_tuple_eq1 tail_cons_tuple !addr_lte0r
+              -!(ltr_int [numDomainType of rat]) !rat0 af_decomp subr_lte0r.
       move => /(lter_pmul2l l2.1) <- /(lter_nmul2l l1.1) <-.
       rewrite !mulrN mulrCA; apply lter_trans.
 Qed.
@@ -451,7 +450,7 @@ Proof.
   - by move => f IH I; apply/(iffP idP); move/IH.
   - by move => f1 IH1 f2 IH2 I; apply/(iffP andP); case => /IH1 H /IH2 H0.
   - by move => f1 IH1 f2 IH2 I; apply/(iffP orP);
-      (case; [move/IH1 | move/IH2]); auto.
+      (case; [move/IH1; left | move/IH2; right]).
   - by move => f1 IH1 f2 IH2 I; apply(iffP implyP) => H /IH1 /H /IH2.
   - move => l1 l2 I; rewrite !LRA_term_val_af -subr_ge0.
     set r1 := (_ - _)%R. set r2 := (\sum_i _)%R.

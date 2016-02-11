@@ -1,6 +1,6 @@
 include ./.deps
 
-COQLIBS=-R coq Vass ${COQLIBS}
+COQLIBS=-R . vass ${COQLIBS}
 VOFILES=$(VFILES:.v=.vo)
 GLOBFILES=$(VFILES:.v=.glob)
 
@@ -13,7 +13,7 @@ clean:
 	rm -f .deps ${VOFILES} ${GLOBFILES}
 
 .deps: ${VFILES}
-	coqdep -c -w -slash ${COQLIBS} ${VFILES} > .deps
+	coqdep -c -w ${COQLIBS} ${VFILES} > .deps
 
 %.vo %.glob: %.v
 	coqc -q ${COQLIBS} $*
