@@ -77,16 +77,77 @@ Proof.
   - by move => H x /allpairsP [] [i j] [] /= H0 H1 ->; apply H.
 Qed.
 
-(* extensions for ssralg and ssrnum *)
+(******************************************************************************)
+(*  extensions for fintype                                                    *)
+(******************************************************************************)
 
 Import GRing.Theory Num.Theory.
+
+Section Range.
+Variable (i k : int).
+
+Inductive range : predArgType := Range j of (i <= j <= k)%R.
+
+Coercion int_of_range r := let: (Range j _) := r in j.
+
+Lemma lb_range (r : range) : (i <= r)%R. Proof. by case r => /= j /andP []. Qed.
+Lemma ub_range (r : range) : (r <= k)%R. Proof. by case r => /= j /andP []. Qed.
+
+Canonical range_subType := [subType for int_of_range].
+Definition range_eqMixin := Eval hnf in [eqMixin of range by <:].
+Canonical range_eqType := Eval hnf in EqType range range_eqMixin.
+Definition range_choiceMixin := [choiceMixin of range by <:].
+Canonical range_choiceType := Eval hnf in ChoiceType range range_choiceMixin.
+Definition range_countMixin := [countMixin of range by <:].
+Canonical range_countType := Eval hnf in CountType range range_countMixin.
+Canonical range_subCountType := [subCountType of range].
+
+Definition range_enum : seq range :=
+  pmap insub
+    (map Negz (match i with Negz i' => iota 0 i'.+1 | _ => [::] end) ++
+     map Posz (match k with Posz k' => iota 0 k'.+1 | _ => [::] end)).
+
+Lemma range_enum_uniq : uniq range_enum.
+Proof.
+  rewrite pmap_sub_uniq // cat_uniq !map_inj_in_uniq;
+    first (case: i => i'; case: k => k'; rewrite ?iota_uniq // andTb andbT).
+  - by rewrite -all_predC /=; elim: map.
+  - rewrite -all_predC all_map.
+    by elim: (iota 0 k'.+1) => //= n ns ->; rewrite andbT !inE /=; elim: iota.
+  - by move => /= x y _ _ [].
+  - by move => /= x y _ _ [].
+Qed.
+
+Lemma mem_range_enum r : r \in range_enum.
+Proof.
+  rewrite -(mem_map val_inj) /= /range_enum.
+  case: r => /= j /andP [H H0]; rewrite pmap_filter;
+    last by move => j'; case: insubP.
+  rewrite mem_filter mem_cat; apply/andP; split;
+    first by case: insubP => //; rewrite H H0.
+  apply/orP; case: j H H0 => j' H H0; [right | left];
+    (rewrite mem_map; last by move => ? ? []).
+  - by case: k H0 => // k' H0; rewrite (mem_iota 0 k'.+1).
+  - by case: i H => // i' H; rewrite (mem_iota 0 i'.+1) leq0n ltnS.
+Qed.
+
+Definition range_finMixin :=
+  Eval hnf in UniqFinMixin range_enum_uniq mem_range_enum.
+
+Canonical range_finType := Eval hnf in FinType range range_finMixin.
+Canonical range_subFinType := Eval hnf in [subFinType of range].
+
+End Range.
+
+(******************************************************************************)
+(*  extensions for ssralg and ssrnum                                          *)
+(******************************************************************************)
 
 Section algebra_ext.
 
 Variable (R : numDomainType).
 
-Definition lter b : rel R :=
-  if b then Num.Def.ler else Num.Def.ltr.
+Definition lter b : rel R := if b then Num.le else Num.lt.
 
 Lemma lterE b r1 r2 :
   lter b r1 r2 = (if b then (r1 <= r2)%R else (r1 < r2)%R).
@@ -201,7 +262,9 @@ Lemma lter_ndivr_mull (F : numFieldType) b (z x y : F) :
   (z < 0)%R -> lter b (z^-1 * y)%R x = lter b (z * x)%R y.
 Proof. by case: b => H /=; rewrite lter_ndivr_mull. Qed.
 
-(* extensions for interval *)
+(******************************************************************************)
+(*  extensions for interval                                                   *)
+(******************************************************************************)
 
 Notation itv1 := `]-oo, +oo[%R.
 Notation itv0 := `]0, 0[%R.
@@ -553,3 +616,14 @@ Proof.
       by apply/H/allpairsP; exists (i, j); do ! split.
     + by case: r {H} => // _; rewrite big_nil.
 Qed.
+
+(******************************************************************************)
+(*  extensions for matrix                                                     *)
+(******************************************************************************)
+
+Lemma trmxD (R : zmodType) m n : {morph @trmx R m n : x y / (x + y)%R}.
+Proof. by move => x y; apply/matrixP => i j; rewrite !mxE. Qed.
+
+Lemma trmx_scale (R : ringType) m n (a : R) :
+  {morph @trmx _ m n : x / (a *: x)%R}.
+Proof. by move => x; apply/matrixP => i j; rewrite !mxE. Qed.

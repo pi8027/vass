@@ -1,7 +1,3 @@
-(*
-(add-to-list 'coq-load-path (list "~/src/coq/regular/" ""))
-*)
-
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import all_ssreflect all_algebra.
 Require Import utils automata.
@@ -31,64 +27,7 @@ Proof.
             {2}(divz_eq m d) ler_add2l; apply modz_ge0, lt0r_neq0.
 Qed.
 
-(* extensions for fintype *)
-
-Section Range.
-Variable (i k : int).
-
-Inductive range : predArgType := Range j of ((i <= j) && (j <= k))%R.
-
-Coercion int_of_range r := let: (Range j _) := r in j.
-
-Lemma lb_range (r : range) : (i <= r)%R. Proof. by case r => /= j /andP []. Qed.
-Lemma ub_range (r : range) : (r <= k)%R. Proof. by case r => /= j /andP []. Qed.
-
-Canonical range_subType := [subType for int_of_range].
-Definition range_eqMixin := Eval hnf in [eqMixin of range by <:].
-Canonical range_eqType := Eval hnf in EqType range range_eqMixin.
-Definition range_choiceMixin := [choiceMixin of range by <:].
-Canonical range_choiceType := Eval hnf in ChoiceType range range_choiceMixin.
-Definition range_countMixin := [countMixin of range by <:].
-Canonical range_countType := Eval hnf in CountType range range_countMixin.
-Canonical range_subCountType := [subCountType of range].
-
-Definition range_enum : seq range :=
-  pmap insub
-    (map Negz (match i with Negz i' => iota 0 i'.+1 | _ => [::] end) ++
-     map Posz (match k with Posz k' => iota 0 k'.+1 | _ => [::] end)).
-
-Lemma range_enum_uniq : uniq range_enum.
-Proof.
-  rewrite pmap_sub_uniq // cat_uniq !map_inj_in_uniq;
-    first (case: i => i'; case: k => k'; rewrite ?iota_uniq // andTb andbT).
-  - by rewrite -all_predC /=; elim: map.
-  - rewrite -all_predC all_map.
-    by elim: (iota 0 k'.+1) => //= n ns ->; rewrite andbT !inE /=; elim: iota.
-  - by move => /= x y _ _ [].
-  - by move => /= x y _ _ [].
-Qed.
-
-Lemma mem_range_enum r : r \in range_enum.
-Proof.
-  rewrite -(mem_map val_inj) /= /range_enum.
-  case: r => /= j /andP [H H0]; rewrite pmap_filter;
-    last by move => j'; case: insubP.
-  rewrite mem_filter mem_cat; apply/andP; split;
-    first by case: insubP => //; rewrite H H0.
-  apply/orP; case: j H H0 => j' H H0; [right | left];
-    (rewrite mem_map; last by move => ? ? []).
-  - by case: k H0 => // k' H0; rewrite (mem_iota 0 k'.+1).
-  - by case: i H => // i' H; rewrite (mem_iota 0 i'.+1) leq0n ltnS.
-Qed.
-
-Definition range_finMixin :=
-  Eval hnf in UniqFinMixin range_enum_uniq mem_range_enum.
-Canonical range_finType := Eval hnf in FinType range range_finMixin.
-Canonical range_subFinType := Eval hnf in [subFinType of range].
-
-End Range.
-
-(* automata construction *)
+(* Automata construction for Presburger arithmetic *)
 
 Section word_assign_conversion.
 Variable (fvs : nat).
@@ -258,33 +197,60 @@ Proof.
   rewrite -ltrNge ltr_def => /andP [].
 Qed.
 
-Definition afdfa : dfa [finType of bool ^ fvs] :=
+Definition leq_dfa : dfa [finType of bool ^ fvs] :=
   {| dfa_state      := [finType of range state_lb state_ub];
      dfa_s          := Range afdfa_s_proof;
      dfa_fin q      := (0 <= q)%R;
      dfa_trans q ch := Range (afdfa_trans_proof q ch)
   |}.
 
-Lemma afdfa_equiv w :
-  w \in dfa_lang afdfa = (\sum_(m < fvs) cs m * (assign_of_word w) m <= n)%R.
+Definition eq_dfa : dfa [finType of bool ^ fvs] :=
+  {| dfa_state := [finType of option (range state_lb state_ub)];
+     dfa_s     := Some (Range afdfa_s_proof);
+     dfa_fin q := oapp (fun q' => 0%R == int_of_range q') false q;
+     dfa_trans := fun q (ch : bool ^ fvs) =>
+       oapp (fun q' =>
+               if (int_of_range q' == \sum_(i : 'I_fvs | ch i) cs i %[mod 2])%Z
+               then Some (Range (afdfa_trans_proof q' ch)) else None)%Z
+            None q
+  |}.
+
+Lemma afdfa_step ch w :
+  ((\sum_(m < fvs) cs m * (assign_of_word w) m) * 2 +
+   \sum_(i < fvs | ch i) cs i)%R =
+  (\sum_(m < fvs) cs m * [ffun i => (ch i + (assign_of_word w) i * 2)%N] m)%R.
+Proof.
+  rewrite big_distrl /= (big_mkcond ch) -big_split /=; apply eq_bigr => i _.
+  by rewrite ffunE -mulrb -mulr_natr natz -mulrA -mulrDr addrC PoszD PoszM.
+Qed.
+
+Lemma leq_dfaP w :
+  w \in dfa_lang leq_dfa = (\sum_(m < fvs) cs m * (assign_of_word w) m <= n)%R.
 Proof.
   rewrite delta_accept unfold_in /=.
   elim: w n afdfa_s_proof => /= [| ch w IH] n' H.
   - by congr Num.le; apply big_rec => // i x _ <-; rewrite ffunE mulr0.
-  - rewrite delta_cons /=.
-    rewrite {}IH.
-    rewrite lez_divRL // ler_subr_addr /=.
-    congr Num.le.
-    rewrite big_distrl /= (big_mkcond ch) -big_split /=.
-    apply eq_bigr => i _.
-    by rewrite ffunE -mulrb -mulr_natr natz -mulrA -mulrDr addrC PoszD PoszM.
-Restart.
+  - by rewrite {}IH lez_divRL // ler_subr_addr afdfa_step.
+Qed.
+
+Lemma eq_dfaP w :
+  w \in dfa_lang eq_dfa = (\sum_(m < fvs) cs m * (assign_of_word w) m == n)%R.
+Proof.
   rewrite delta_accept unfold_in /=.
   elim: w n afdfa_s_proof => /= [| ch w IH] n' H.
-  - by congr Num.le; apply big_rec => // i x _ <-; rewrite ffunE mulr0.
-  - rewrite {}IH lez_divRL // ler_subr_addr; congr Num.le.
-    rewrite big_distrl /= (big_mkcond ch) -big_split /=; apply eq_bigr => i _.
-    by rewrite ffunE -mulrb -mulr_natr natz -mulrA -mulrDr addrC PoszD PoszM.
+  - by congr (_ == _); apply big_rec => //= i x _ <-; rewrite ffunE mulr0.
+  - rewrite delta_cons -afdfa_step /=; case: ifP => /=.
+    + rewrite IH eqz_mod_dvd.
+      have/mulrIz/inj_eq <-: (2 != 0 :> int) by [].
+      rewrite !mulrzz !(mulrC (2 : int)) dvdz_eq => /eqP ->.
+      by rewrite eq_sym subr_eq.
+    + rewrite eqz_mod_dvd => /dvdz_mod0P H0.
+      have -> /=: delta (None : eq_dfa) w = None by elim: w {IH} => //.
+      rewrite eq_sym -subr_eq; apply/esym/eqP => /(f_equal (modz ^~ 2)).
+      move: H0; set x := (n' - _)%R.
+      case: (x %% 2)%Z (@modz_ge0 x 2 erefl) (@ltz_pmod x 2 erefl) =>
+        [] [| []] //= _ _ _.
+      by rewrite modzMl.
 Qed.
 
 End dfa_of_atomic_formula.
@@ -404,7 +370,19 @@ Inductive formula (v : nat) :=
   | f_or      of formula v & formula v
   | f_imply   of formula v & formula v
   | f_leq     of term v & term v
-  | f_lt      of term v & term v.
+  | f_lt      of term v & term v
+  | f_eq      of term v & term v.
+
+Fixpoint t_rename v v' (f : 'I_v -> 'I_v') (t : term v) : term v' :=
+  match t with
+    | t_const n => t_const v' n
+    | t_var var => t_var (f var)
+    | t_add t1 t2 => t_add (t_rename f t1) (t_rename f t2)
+    | t_mulc n t => t_mulc n (t_rename f t)
+  end.
+
+Definition f_divisible v (n : nat) (t : term v) : formula v :=
+  f_exists (@f_eq (1 + v) (t_mulc n (t_var ord0)) (t_rename (@rshift 1 _) t)).
 
 Check (@f_all 0 (f_all (f_leq (t_var (inord 1))
                               (t_add (t_var (inord 1)) (t_var (inord 0)))))).
@@ -416,7 +394,8 @@ Inductive nformula (v : nat) :=
   | nf_neg    of nformula v
   | nf_and    of nformula v & nformula v
   | nf_or     of nformula v & nformula v
-  | nf_atomic of int ^ v & int.
+  | nf_leq    of int ^ v & int
+  | nf_eq     of int ^ v & int.
 
 (* interpretation of Presburger arithmetic  *)
 
@@ -445,6 +424,8 @@ Fixpoint interpret_formula fvs (f : formula fvs) : nat ^ fvs -> Prop :=
       fun assign => interpret_term t assign <= interpret_term t' assign
     | f_lt t t' =>
       fun assign => interpret_term t assign < interpret_term t' assign
+    | f_eq t t' =>
+      fun assign => interpret_term t assign == interpret_term t' assign
   end.
 
 Fixpoint interpret_nformula fvs (f : nformula fvs) : nat ^ fvs -> Prop :=
@@ -456,7 +437,8 @@ Fixpoint interpret_nformula fvs (f : nformula fvs) : nat ^ fvs -> Prop :=
       fun assign => interpret_nformula f assign /\ interpret_nformula f' assign
     | nf_or f f' =>
       fun assign => interpret_nformula f assign \/ interpret_nformula f' assign
-    | nf_atomic t n => fun assign => (\sum_(m < fvs) t m * assign m <= n)%R
+    | nf_leq t n => fun assign => (\sum_(m < fvs) t m * assign m <= n)%R
+    | nf_eq t n  => fun assign => (\sum_(m < fvs) t m * assign m == n)%R
   end.
 
 (* normal form computation *)
@@ -485,11 +467,15 @@ Fixpoint normal_f fvs (f : formula fvs) : nformula fvs :=
     | f_leq t t' =>
       let: (cs, n) := normal_t t in
       let: (cs', m) := normal_t t' in
-      nf_atomic [ffun var => cs var - cs' var]%R (m - n)%R
+      nf_leq [ffun var => cs var - cs' var]%R (m - n)%R
     | f_lt t t' =>
       let: (cs, n) := normal_t t in
       let: (cs', m) := normal_t t' in
-      nf_atomic [ffun var => cs var - cs' var]%R (m - n - 1)%R
+      nf_leq [ffun var => cs var - cs' var]%R (m - n - 1)%R
+    | f_eq t t' =>
+      let: (cs, n) := normal_t t in
+      let: (cs', m) := normal_t t' in
+      nf_eq [ffun var => cs var - cs' var]%R (m - n)%R
   end.
 
 (* correctness proof of normal form computation *)
@@ -527,7 +513,7 @@ Proof.
     = (\sum_(m0 < fvs') [ffun var => cs' var - cs var] m0 * a m0)%R
     by rewrite (big_endo _ (@opprD _)) // -big_split /=;
       apply eq_bigr => // i _; rewrite ffunE mulrDl mulNr.
-  move => dne; move: fvs f assign; refine (formula_ind _ _ _ _ _ _ _ _).
+  move => dne; move: fvs f assign; refine (formula_ind _ _ _ _ _ _ _ _ _).
   - move => fvs f IH assign; split => H.
     + by case => a; apply; apply IH, H.
     + by move => a; apply IH, dne => H0; apply H; exists a.
@@ -547,6 +533,11 @@ Proof.
     case_eq (normal_t t); case_eq (normal_t t') => /= cs n _ cs' m _.
     by rewrite ler_sub_addr lez_addr1 -ltr_subr_addr -addrA addrC -ltr_subl_addr
                Hbigop.
+  - move => /= fvs t t' assign.
+    have /inj_eq <- : injective Posz by move => x y [].
+    rewrite !nt_correct.
+    case_eq (normal_t t); case_eq (normal_t t') => /= cs n _ cs' m _.
+    by rewrite eq_sym -subr_eq -addrA addrC eq_sym -subr_eq Hbigop.
 Qed.
 
 (* normal form to automata conversion *)
@@ -557,21 +548,25 @@ Fixpoint dfa_of_nformula fvs (f : nformula fvs) : dfa [finType of bool ^ fvs] :=
     | nf_neg f' => dfa_compl (dfa_of_nformula f')
     | nf_and f1 f2 => dfa_op andb (dfa_of_nformula f1) (dfa_of_nformula f2)
     | nf_or f1 f2 => dfa_op orb (dfa_of_nformula f1) (dfa_of_nformula f2)
-    | nf_atomic t n => afdfa t n
+    | nf_leq t n => leq_dfa t n
+    | nf_eq t n => eq_dfa t n
   end.
 
 Lemma dfa_of_nformula_correct fvs (f : nformula fvs) w :
   reflect (interpret_nformula f (assign_of_word w))
           (w \in dfa_lang (dfa_of_nformula f)).
 Proof.
-  move: fvs f w; refine (nformula_rect _ _ _ _ _) => /=.
-  - move => fvs f IH w; rewrite -nfa_to_dfa_correct; apply exists_nfaP, IH.
-  - by move => fvs f IH w; rewrite dfa_compl_correct; apply: (iffP idP) => /IH.
+  move: fvs f w; refine (nformula_rect _ _ _ _ _ _) => /=.
+  - move => fvs f IH w.
+    rewrite -nfa_to_dfa_correct; apply exists_nfaP, IH.
+  - move => fvs f IH w.
+    by rewrite dfa_compl_correct; apply: (iffP idP) => /IH.
   - move => fvs f1 IHf1 f2 IHf2 w; rewrite dfa_op_correct;
       apply: (iffP andP); case => /IHf1 H /IHf2 H0; tauto.
   - move => fvs f1 IHf1 f2 IHf2 w; rewrite dfa_op_correct;
       apply: (iffP orP); (case; [move/IHf1 | move/IHf2]); tauto.
-  - move => fvs t n w; rewrite afdfa_equiv; apply idP.
+  - move => fvs t n w; rewrite leq_dfaP; apply idP.
+  - move => fvs t n w; rewrite eq_dfaP; apply idP.
 Qed.
 
 (* decision procedures *)
@@ -642,6 +637,3 @@ Proof.
     by move/presburger_dec_wP: (H (assign_of_word w));
       rewrite /presburger_dec_w delta_accept.
 Qed.
-
-Extraction Language Ocaml.
-Extraction "presburger_8.5.ml" presburger_dec presburger_sat presburger_valid.
