@@ -125,13 +125,16 @@ rewrite -{2}(subr0 (y _ _)); case: (lerP 0 (y i ord0)) => H2.
 - by rewrite sub0r mulrN -mulNr => /(mulIf H3); apply/eqP; rewrite neqr_lt H0.
 Qed.
 
-Goal forall C, cone C -> forall x, dual_cone (dual_cone C) x <-> closure C x.
+Lemma twice_dual_cone C :
+  cone C -> forall x, dual_cone (dual_cone C) x <-> closure C x.
 Proof.
-move => C [/= HC1 HC2 HC3] x; rewrite /closure /dual_cone; split.
+move => [/= HC1 HC2 HC3] x; split.
 - move => H e H0.
   admit.
-- move => H y H0.
-  admit.
+- move => H; apply dual_cone_closed.
+  move => e H0; case: (H e H0) => x' H1 H2; exists x' => //.
+  move => y H3; move: (H3 x' H1); congr (_ <= _)%R.
+  by rewrite -(trmxK (_ *m _)%R) trmx_mul trmxK mxE.
 Abort.
 
 Lemma fg_conic C : fg_cone C -> cone C.
@@ -153,9 +156,76 @@ case => basis_num basis axiom; constructor.
   + by rewrite scalemxAr.
 Qed.
 
+Lemma fg_cone_LRA C (fg : fg_cone C) :
+  exists f : seq (rat ^ (fg_cone_num fg + d)), forall x,
+      C x <->
+      (exists c : rat ^ fg_cone_num fg,
+          all (LRA_interpret_literal (cat_tuple c [ffun i => x i ord0]))
+              (map (pair true) f)).
+Proof.
+case: fg => n basis H => /=.
+pose fs_pos : seq (rat ^ (n + d)) :=
+  [seq [ffun j => ((j == lshift d i)%:R)%R] | i <- enum 'I_n].
+pose fs_eq : seq (rat ^ (n + d)) :=
+  [seq cat_tuple [ffun j => - basis i j]%R
+       [ffun j => (j == i)%:R]%R | i <- enum 'I_d].
+have Hpos (x : 'cV_d) (c : 'cV_n):
+  pos_cV c =
+  all (LRA_interpret_literal
+         (cat_tuple [ffun i => c i ord0] [ffun i => x i ord0]))
+      (map (pair true) fs_pos).
+  rewrite /pos_cV 2!all_map all_enum; apply eq_forallb => /= i.
+  rewrite /= /LRA_interpret_literal /LRA_interpret_af /=; congr (_ <= _)%R.
+  suff/(eq_bigr _) ->: forall j : 'I_(n + d), true ->
+    ([ffun j => (j == lshift d i)%:R] j *
+     (cat_tuple [ffun j => c j ord0] [ffun j => x j ord0]) j =
+     if j == lshift d i then c i ord0 else 0)%R
+    by rewrite -big_mkcond big_pred1_eq.
+  by move => j _; rewrite !ffunE; case: eqP => //= H0;
+    rewrite (mul0r, mul1r) // H0; rewrite split_lshift ffunE.
+have Heq (x : 'cV_d) (c : 'cV_n):
+  (x == basis *m c)%R =
+  all (fun f => 0%R == LRA_interpret_af
+                (cat_tuple [ffun i => c i ord0] [ffun i => x i ord0]) f) fs_eq.
+  rewrite all_map all_enum.
+  have ->: (x == (basis *m c)%R) =
+           [forall i, x i ord0 == (basis *m c)%R i ord0].
+    case: eqP => /matrixP => H0; apply/esym/forallP;
+      first by move => i; apply/eqP.
+    by move => H1; apply H0 => i j; rewrite zmodp.ord1; apply/eqP.
+  apply eq_forallb => /= i /=.
+  rewrite -(subr_eq0 (_ i ord0)) eq_sym addrC mxE
+          /LRA_interpret_af big_split_ord /=; congr (_ == _ + _)%R;
+    first by rewrite (big_endo _ (@opprD _)) //; apply eq_bigr => j _;
+             rewrite !ffunE split_lshift !ffunE mulNr.
+  suff/(eq_bigr _) ->: forall j : 'I_d, true ->
+    ((cat_tuple [ffun j => - basis i j] [ffun j => (j == i)%:R]) (rshift n j) *
+     (cat_tuple [ffun j => c j ord0] [ffun j => x j ord0]) (rshift n j) =
+     if j == i then x i ord0 else 0)%R
+    by rewrite -big_mkcond big_pred1_eq.
+  by move => j _; rewrite !ffunE split_rshift !ffunE;
+    case: eqP; rewrite (mul0r, mul1r); first move => ->.
+move: fs_pos fs_eq Hpos Heq => fs_pos fs_eq Hpos Heq.
+exists (fs_pos ++ fs_eq ++ (map -%R%R fs_eq)) => x; rewrite {}H.
+split; case => c; [move => H /eqP H0; exists [ffun i => c i ord0]; move: H H0 |
+                   rewrite !map_cat !all_cat => /and3P [H H0 H1];
+                     exists (\col_i c i)%R; last apply/eqP];
+  rewrite ?(Hpos x) {Hpos} ?{}Heq.
+- by move => H H0; rewrite !map_cat !all_cat; apply/and3P; split => // {H};
+    rewrite all_map ?(all_map _ _ fs_eq) /LRA_interpret_literal;
+    apply/allP => /= f /(allP H0) /eqP; rewrite ?LRA_interpret_af_opp => <-.
+- move: H; congr (all (LRA_interpret_literal (cat_tuple _ _)) _).
+  by apply/ffunP => i; rewrite !ffunE mxE.
+- have ->: [ffun i => (\col_i0 c i0)%R i ord0] = c
+    by apply/ffunP => i; rewrite !ffunE mxE.
+  by apply/allP => /= f Hf; move: {H} H0 H1;
+    rewrite /LRA_interpret_literal !all_map eqr_le
+      => /allP /(_ f Hf) /= -> /allP /(_ f Hf) /=;
+    rewrite LRA_interpret_af_opp oppr_ge0 => ->.
+Qed.
+
 Lemma duality_direct C : fg_cone C -> poly_cone C.
 Proof.
-case => n basis H.
 Abort.
 
 Lemma duality_converse C : poly_cone C -> fg_cone C.
