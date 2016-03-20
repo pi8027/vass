@@ -59,6 +59,13 @@ Proof. by rewrite /tail_tuple ffunE. Qed.
 Lemma tail_cons_tuple (h : A) (t : A ^ n) : tail_tuple (cons_tuple h t) = t.
 Proof. by apply/ffunP => /= i; rewrite !ffunE split_rshift. Qed.
 
+Lemma cons_tail_tuple (t : A ^ n.+1) : cons_tuple (t ord0) (tail_tuple t) = t.
+Proof.
+  apply/ffunP => /= i; rewrite !ffunE; case: splitP => j Hj.
+  - by congr fun_of_fin; apply/val_inj; rewrite /= {}Hj; case: j => -[].
+  - by rewrite ffunE; congr fun_of_fin; apply/val_inj.
+Qed.
+
 Lemma cons_tuple_const (x : A) : cons_tuple x [ffun => x] = [ffun => x].
 Proof.
   apply/ffunP => /= i; rewrite /cons_tuple !ffunE.
@@ -66,6 +73,25 @@ Proof.
 Qed.
 
 End cons_tuple.
+
+Lemma cat_cons_tuple (A : Type) n m (h : A) (t1 : A ^ n) (t2 : A ^ m) :
+  cat_tuple (cons_tuple h t1) t2 = cons_tuple h (cat_tuple t1 t2).
+Proof.
+apply/esym/ffunP => /= i; rewrite !ffunE.
+case: splitP => j Hj; last case: splitP => k Hk.
+- suff ->: i = (lshift m ord0) by rewrite split_lshift cons_tuple_eq1.
+  by apply/val_inj => /=; rewrite {}Hj; case: j => -[].
+- rewrite !ffunE.
+  have: j < n by rewrite -add1n -Hj {}Hk; case: k.
+  case: splitP => // l Hl _.
+  have: ~~ (k < 1) by rewrite -Hk Hj.
+  case: (@splitP 1 n) => // l' Hl' _; congr fun_of_fin.
+  by apply/val_inj/succn_inj; rewrite /= -Hl -add1n -Hj -(add1n l') -Hl'.
+- rewrite !ffunE.
+  have: ~~ (j < n) by rewrite -add1n -Hj Hk -ltnNge leq_addr.
+  case: splitP => // l Hl _; congr fun_of_fin.
+  by apply/val_inj/(@addnI n.+1); rewrite /= -Hk Hj Hl add1n addSn.
+Qed.
 
 Lemma cons_tuple_map (A B : Type) (f : A -> B) n (h : A) (t : 'I_n -> A) :
   [ffun i => f ((cons_tuple h [ffun i => t i]) i)] =
