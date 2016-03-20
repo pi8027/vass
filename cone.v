@@ -38,14 +38,15 @@ Definition closure (X : 'cV[rat]_d -> Prop) (y : 'cV_d) :=
 Definition closed_set (X : 'cV[rat]_d -> Prop) :=
   forall x, closure X x -> X x.
 
-Record cone (C : 'cV[rat]_d -> Prop) := (* cones *)
+Record cone (C : 'cV[rat]_d -> Prop) := Cone (* cones *)
   {
     cone_zero    : C 0%R;
     cone_add x y : C x -> C y -> C (x + y)%R;
     cone_mul a x : (0 <= a)%R -> C x -> C (a *: x)%R;
   }.
 
-Record fg_cone (C : 'cV[rat]_d -> Prop) := (* finitely generated cones *)
+Record fg_cone (C : 'cV[rat]_d -> Prop) :=
+  Fg_cone (* finitely generated cones *)
   {
     fg_cone_num     : nat;
     fg_cone_basis   : 'M_(d, fg_cone_num);
@@ -54,7 +55,7 @@ Record fg_cone (C : 'cV[rat]_d -> Prop) := (* finitely generated cones *)
                                   pos_cV c & x = (fg_cone_basis *m c)%R
   }.
 
-Record poly_cone (C : 'cV[rat]_d -> Prop) := (* polyhedral cones *)
+Record poly_cone (C : 'cV[rat]_d -> Prop) := Poly_cone (* polyhedral cones *)
   {
     poly_cone_num     : nat;
     poly_cone_normal  : 'M_(poly_cone_num, d);
@@ -157,18 +158,22 @@ case => basis_num basis axiom; constructor.
 Qed.
 
 Lemma fg_cone_LRA C (fg : fg_cone C) :
-  exists f : seq (rat ^ (fg_cone_num fg + d)), forall x,
-      C x <->
+  let ls_pos : seq (rat ^ (fg_cone_num fg + d)) :=
+      [seq [ffun j => ((j == lshift d i)%:R)%R] |
+           i <- enum 'I_(fg_cone_num fg)] in
+  let ls_eq : seq (rat ^ (fg_cone_num fg + d)) :=
+      [seq cat_tuple [ffun j => - fg_cone_basis fg i j]%R
+           [ffun j => (j == i)%:R]%R | i <- enum 'I_d] in
+  let ls := ls_pos ++ ls_eq ++ (map -%R%R ls_eq) in
+  forall x, C x <->
       (exists c : rat ^ fg_cone_num fg,
           all (LRA_interpret_literal (cat_tuple c [ffun i => x i ord0]))
-              (map (pair true) f)).
+              (map (pair true) ls)).
 Proof.
 case: fg => n basis H => /=.
-pose fs_pos : seq (rat ^ (n + d)) :=
-  [seq [ffun j => ((j == lshift d i)%:R)%R] | i <- enum 'I_n].
-pose fs_eq : seq (rat ^ (n + d)) :=
-  [seq cat_tuple [ffun j => - basis i j]%R
-       [ffun j => (j == i)%:R]%R | i <- enum 'I_d].
+set fs_pos := [seq [ffun j => ((j == lshift d i)%:R)%R] | i <- enum 'I_n].
+set fs_eq := [seq cat_tuple [ffun j => - basis i j]%R
+                  [ffun j => (j == i)%:R]%R | i <- enum 'I_d].
 have Hpos (x : 'cV_d) (c : 'cV_n):
   pos_cV c =
   all (LRA_interpret_literal
@@ -205,8 +210,7 @@ have Heq (x : 'cV_d) (c : 'cV_n):
     by rewrite -big_mkcond big_pred1_eq.
   by move => j _; rewrite !ffunE split_rshift !ffunE;
     case: eqP; rewrite (mul0r, mul1r); first move => ->.
-move: fs_pos fs_eq Hpos Heq => fs_pos fs_eq Hpos Heq.
-exists (fs_pos ++ fs_eq ++ (map -%R%R fs_eq)) => x; rewrite {}H.
+move: fs_pos fs_eq Hpos Heq => fs_pos fs_eq Hpos Heq x; rewrite {}H.
 split; case => c; [move => H /eqP H0; exists [ffun i => c i ord0]; move: H H0 |
                    rewrite !map_cat !all_cat => /and3P [H H0 H1];
                      exists (\col_i c i)%R; last apply/eqP];
@@ -226,7 +230,33 @@ Qed.
 
 Lemma duality_direct C : fg_cone C -> poly_cone C.
 Proof.
-Abort.
+move => H; case: H (fg_cone_LRA H) => /= n basis HC.
+set ls := map _ _.
+have/multi_exists_conj_elim_allT/allP/=: all fst ls
+  by rewrite all_map; apply/allP => /= i _.
+move: ls => ls Hls Hls_LRA.
+apply (@Poly_cone C _
+  (\matrix_(i, j) (tnth (in_tuple (multi_exists_conj_elim ls)) i).2 j))%R.
+move => x; apply (iffP forallP) => /=.
+- move => H; apply/Hls_LRA/multi_exists_conj_elimP.
+  rewrite -(in_tupleE (multi_exists_conj_elim ls)).
+  apply/all_tnthP => i; move: {H} (H i); rewrite mxE.
+  set lf := (tnth _).
+  have/(eq_bigr _) ->: forall j, true ->
+    ((\matrix_(i', j') (lf i').2 j') i j * x j ord0 = (lf i).2 j * x j ord0)%R
+    by move => j _; rewrite mxE.
+  rewrite /LRA_interpret_literal /LRA_interpret_af Hls ?mem_tnth //=.
+  by congr (_ <= _)%R; apply/eq_bigr => j _; rewrite ffunE.
+- move/Hls_LRA/multi_exists_conj_elimP => H i; move: H.
+  rewrite -{1}(in_tupleE (multi_exists_conj_elim ls)).
+  move/all_tnthP/(_ i); rewrite mxE.
+  set lf := (tnth _).
+  have/(eq_bigr _) ->: forall j, true ->
+    ((\matrix_(i', j') (lf i').2 j') i j * x j ord0 = (lf i).2 j * x j ord0)%R
+    by move => j _; rewrite mxE.
+  rewrite /LRA_interpret_literal /LRA_interpret_af Hls ?mem_tnth //=.
+  by congr (_ <= _)%R; apply/eq_bigr => j _; rewrite ffunE.
+Qed.
 
 Lemma duality_converse C : poly_cone C -> fg_cone C.
 Proof.

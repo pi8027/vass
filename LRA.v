@@ -322,6 +322,13 @@ Definition exists_conj_elim
   <=>  0 <= (a_0 b_1 - b_0 a_1) x_1 + ... + (a_0 b_n - b_0 a_n) x_n
   *).
 
+Fixpoint multi_exists_conj_elim dim1 dim2 :
+  seq (LRA_literal (dim1 + dim2)) -> seq (LRA_literal dim2) :=
+  match dim1 with
+    | 0 => fun ls => [seq (l.1, (split_tuple l.2).2) | l <- ls]
+    | dim1'.+1 => fun ls => multi_exists_conj_elim (exists_conj_elim ls)
+  end.
+
 Definition literal_interval dim (I : rat ^ dim) (l : LRA_literal dim.+1) :=
   let r := (- LRA_interpret_af I (tail_tuple l.2) / l.2 ord0)%R in
   if l.2 ord0 == 0%R
@@ -410,13 +417,6 @@ apply (iffP idP); rewrite /exists_conj_elim all_cat.
     rewrite !mulrN mulrCA; apply lter_trans.
 Qed.
 
-Fixpoint multi_exists_conj_elim
-         dim1 dim2 : seq (LRA_literal (dim1 + dim2)) -> seq (LRA_literal dim2) :=
-  match dim1 with
-    | 0 => fun ls => [seq (l.1, (split_tuple l.2).2) | l <- ls]
-    | dim1'.+1 => fun ls => multi_exists_conj_elim (exists_conj_elim ls)
-  end.
-
 Lemma multi_exists_conj_elimP
       dim1 dim2 I (ls : seq (LRA_literal (dim1 + dim2))) :
   reflect
@@ -437,6 +437,24 @@ elim: dim1 ls => /= [| dim1 IH] ls; last apply/(iffP idP).
     exists (cons_tuple x I'); rewrite cat_cons_tuple.
 - by case => I' H; apply/IH; exists (tail_tuple I'); apply/exists_conj_elimP;
     exists (I' ord0); rewrite -cat_cons_tuple cons_tail_tuple.
+Qed.
+
+Lemma exists_conj_elim_allT dim (ls : seq (LRA_literal dim.+1)) :
+  all fst ls -> all fst (exists_conj_elim ls).
+Proof.
+move => /allP /= H; rewrite /exists_conj_elim all_cat; apply/andP; split.
+- by rewrite all_map; apply/allP => x; rewrite mem_filter => /andP [] _ /H.
+- by apply/all_allpairsP => x y;
+    rewrite !mem_filter => /andP [] _ /H -> /andP [] _ /H ->.
+Qed.
+
+Lemma multi_exists_conj_elim_allT
+      dim1 dim2 (ls : seq (LRA_literal (dim1 + dim2))) :
+  all fst ls -> all fst (multi_exists_conj_elim ls).
+Proof.
+elim: dim1 ls => //= [| dim1 IH].
+- by elim => //= l ls IH /andP [] -> /IH.
+- by move => ls /exists_conj_elim_allT /IH.
 Qed.
 
 Definition exists_DNF_elim dim (lss : seq (seq (LRA_literal dim.+1))) :
