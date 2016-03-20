@@ -5,66 +5,74 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Definition cons_tuple (A : Type) n (h : A) (t : A ^ n) : A ^ n.+1 :=
-  [ffun m => match @fintype.split 1 n m with
+Lemma split_lshift (m n : nat) (i : 'I_m) : split (lshift n i) = inl i.
+Proof. by apply: unsplitK (inl i). Qed.
+
+Lemma split_rshift (m n : nat) (i : 'I_n) : split (rshift m i) = inr i.
+Proof. by apply: unsplitK (inr i). Qed.
+
+Section cat_tuple.
+
+Variable (A : Type) (n m : nat).
+
+Definition cat_tuple (t1 : A ^ n) (t2 : A ^ m) : A ^ (n + m) :=
+  [ffun i => match split i with
+             | inl i' => t1 i'
+             | inr i' => t2 i'
+             end].
+
+Definition split_tuple (t : A ^ (n + m)) : A ^ n * A ^ m :=
+  ([ffun i => t (lshift m i)], [ffun i => t (rshift n i)]).
+
+Lemma cat_tuple_lshift (t1 : A ^ n) (t2 : A ^ m) i :
+  cat_tuple t1 t2 (lshift m i) = t1 i.
+Proof. by rewrite ffunE split_lshift. Qed.
+
+Lemma cat_tuple_rshift (t1 : A ^ n) (t2 : A ^ m) i :
+  cat_tuple t1 t2 (rshift n i) = t2 i.
+Proof. by rewrite ffunE split_rshift. Qed.
+
+End cat_tuple.
+
+Section cons_tuple.
+
+Variable (A : Type) (n : nat).
+
+Definition cons_tuple (h : A) (t : A ^ n) : A ^ n.+1 :=
+  [ffun m => match @split 1 n m with
                | inl _ => h
                | inr i => t i
              end].
 
-Definition tail_tuple (A : Type) n (t : A ^ n.+1) : A ^ n :=
-  [ffun m => t (rshift 1 m)].
+Definition tail_tuple (t : A ^ n.+1) : A ^ n := [ffun m => t (rshift 1 m)].
 
-Lemma cons_tuple_eq1 (A : Type) n (h : A) (t : A ^ n) :
-  cons_tuple h t ord0 = h.
-Proof. rewrite /cons_tuple ffunE; by case: splitP. Qed.
+Lemma cons_tuple_eq1 (h : A) (t : A ^ n) : cons_tuple h t ord0 = h.
+Proof. by rewrite /cons_tuple ffunE; case: splitP. Qed.
 
-Lemma cons_tuple_eq2 (A : Type) n (h : A) (t : A ^ n) (i : 'I_n) :
+Lemma cons_tuple_eq2 (h : A) (t : A ^ n) (i : 'I_n) :
   cons_tuple h t (rshift 1 i) = t i.
-Proof.
-  rewrite /cons_tuple ffunE /rshift.
-  case: splitP => j /=.
-  - by case: j => -[].
-  - by rewrite !add1n; case => /ord_inj <-.
-Qed.
+Proof. by rewrite /cons_tuple ffunE split_rshift. Qed.
 
-Lemma tail_tuple_eq (A : Type) n (t : A ^ n.+1) (i : 'I_n) :
-  tail_tuple t i = t (rshift 1 i).
+Lemma tail_tuple_eq (t : A ^ n.+1) (i : 'I_n) : tail_tuple t i = t (rshift 1 i).
 Proof. by rewrite /tail_tuple ffunE. Qed.
 
-Lemma cons_tuple_const (A : Type) n (x : A) :
-  cons_tuple (n := n) x [ffun => x] = [ffun => x].
+Lemma tail_cons_tuple (h : A) (t : A ^ n) : tail_tuple (cons_tuple h t) = t.
+Proof. by apply/ffunP => /= i; rewrite !ffunE split_rshift. Qed.
+
+Lemma cons_tuple_const (x : A) : cons_tuple x [ffun => x] = [ffun => x].
 Proof.
   apply/ffunP => /= i; rewrite /cons_tuple !ffunE.
-  by case: fintype.splitP => //= i' _; rewrite ffunE.
+  by case: splitP => //= i' _; rewrite ffunE.
 Qed.
+
+End cons_tuple.
 
 Lemma cons_tuple_map (A B : Type) (f : A -> B) n (h : A) (t : 'I_n -> A) :
   [ffun i => f ((cons_tuple h [ffun i => t i]) i)] =
   cons_tuple (f h) [ffun i => f (t i)].
 Proof.
-  apply/ffunP => /= i; rewrite /cons_tuple !ffunE.
-  by case: fintype.splitP => //= i' _; rewrite !ffunE.
-Qed.
-
-Lemma tail_cons_tuple (A : Type) n (h : A) (t : A ^ n) :
-  tail_tuple (cons_tuple h t) = t.
-Proof.
-  apply/ffunP => /= i; rewrite /tail_tuple /cons_tuple /rshift !ffunE.
-  case: splitP => j /=.
-  - by case: j => -[].
-  - by rewrite !add1n; case => /= /ord_inj <-.
-Qed.
-
-Lemma split_lshift (m n : nat) (i : 'I_m) : split (lshift n i) = inl i.
-Proof.
-  case:splitP => /= [j /ord_inj -> // | k H].
-  by move: (ltn_ord i); rewrite H -{2}(addn0 m) ltn_add2l.
-Qed.
-
-Lemma split_rshift (m n : nat) (i : 'I_n) : split (rshift m i) = inr i.
-Proof.
-  case:splitP => /= [j H | k /addnI /ord_inj -> //].
-  by move: (ltn_ord j); rewrite -H -{2}(addn0 m) ltn_add2l.
+  apply/ffunP => /= i; rewrite !ffunE.
+  by case: splitP => //= i' _; rewrite !ffunE.
 Qed.
 
 Lemma all_allpairsP
@@ -75,6 +83,13 @@ Proof.
   apply (iffP allP).
   - by move => H i j H0 H1; apply/H/allpairsP; exists (i, j).
   - by move => H x /allpairsP [] [i j] [] /= H0 H1 ->; apply H.
+Qed.
+
+Lemma all_enum (T : finType) (P : pred T) : all P (enum T) = [forall i, P i].
+Proof.
+  apply/idP; case: ifP; first by move/forallP => H; apply/allP.
+  by move/negP => H /allP H0; apply: H;
+    apply/forallP => x; apply: H0; rewrite mem_enum.
 Qed.
 
 (******************************************************************************)
