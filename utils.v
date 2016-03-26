@@ -12,29 +12,6 @@ Proof. by apply: unsplitK (inl i). Qed.
 Lemma split_rshift (m n : nat) (i : 'I_n) : split (rshift m i) = inr i.
 Proof. by apply: unsplitK (inr i). Qed.
 
-Section cat_tuple.
-
-Variable (A : Type) (n m : nat).
-
-Definition cat_tuple (t1 : A ^ n) (t2 : A ^ m) : A ^ (n + m) :=
-  [ffun i => match split i with
-             | inl i' => t1 i'
-             | inr i' => t2 i'
-             end].
-
-Definition split_tuple (t : A ^ (n + m)) : A ^ n * A ^ m :=
-  ([ffun i => t (lshift m i)], [ffun i => t (rshift n i)]).
-
-Lemma cat_tuple_lshift (t1 : A ^ n) (t2 : A ^ m) i :
-  cat_tuple t1 t2 (lshift m i) = t1 i.
-Proof. by rewrite ffunE split_lshift. Qed.
-
-Lemma cat_tuple_rshift (t1 : A ^ n) (t2 : A ^ m) i :
-  cat_tuple t1 t2 (rshift n i) = t2 i.
-Proof. by rewrite ffunE split_rshift. Qed.
-
-End cat_tuple.
-
 Section cons_tuple.
 
 Variable (A : Type) (n : nat).
@@ -74,25 +51,6 @@ by case: splitP => //= i' _; rewrite ffunE.
 Qed.
 
 End cons_tuple.
-
-Lemma cat_cons_tuple (A : Type) n m (h : A) (t1 : A ^ n) (t2 : A ^ m) :
-  cat_tuple (cons_tuple h t1) t2 = cons_tuple h (cat_tuple t1 t2).
-Proof.
-apply/esym/ffunP => /= i; rewrite !ffunE.
-case: splitP => j Hj; last case: splitP => k Hk.
-- suff ->: i = (lshift m 0%R) by rewrite split_lshift cons_tuple_eq1.
-  by apply/val_inj => /=; rewrite {}Hj; case: j => -[].
-- rewrite !ffunE.
-  have: j < n by rewrite -add1n -Hj {}Hk; case: k.
-  case: splitP => // l Hl _.
-  have: ~~ (k < 1) by rewrite -Hk Hj.
-  case: (@splitP 1 n) => // l' Hl' _; congr fun_of_fin.
-  by apply/val_inj/succn_inj; rewrite /= -Hl -add1n -Hj -(add1n l') -Hl'.
-- rewrite !ffunE.
-  have: ~~ (j < n) by rewrite -add1n -Hj Hk -ltnNge leq_addr.
-  case: splitP => // l Hl _; congr fun_of_fin.
-  by apply/val_inj/(@addnI n.+1); rewrite /= -Hk Hj Hl add1n addSn.
-Qed.
 
 Lemma cons_tuple_map (A B : Type) (f : A -> B) n (h : A) (t : 'I_n -> A) :
   [ffun i => f ((cons_tuple h [ffun i => t i]) i)] =

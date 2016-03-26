@@ -1,6 +1,6 @@
 Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import all_ssreflect all_algebra.
-Import GRing.Theory Num.Theory.
+From mathcomp Require Import all_ssreflect all_fingroup all_algebra zmodp.
+Import GroupScope GRing.Theory Num.Theory.
 Require Import utils.
 
 (******************************************************************************)
@@ -100,7 +100,7 @@ Definition LRA_interpret_literal dim (I : rat ^ dim) (f : LRA_literal dim) :=
 
 Lemma LRA_af_recl dim (I f : rat ^ dim.+1) :
   LRA_interpret_af I f =
-  (f ord0 * I ord0 + LRA_interpret_af (tail_tuple I) (tail_tuple f))%R.
+  (f 0 * I 0 + LRA_interpret_af (tail_tuple I) (tail_tuple f))%R.
 Proof.
 rewrite /LRA_interpret_af big_ord_recl.
 by congr +%R; apply eq_bigr => i _; rewrite /tail_tuple !ffunE zmodp.rshift1.
@@ -306,14 +306,14 @@ Qed.
 
 Definition exists_conj_elim
   dim (ls : seq (LRA_literal dim.+1)) : seq (LRA_literal dim) :=
-  let lsp := [seq l : LRA_literal dim.+1 <- ls | (0 < l.2 ord0)]%R in
+  let lsp := [seq l : LRA_literal dim.+1 <- ls | (0 < l.2 0)]%R in
     (* - (a_1 x_1 + ... + a_n x_n) <<= a_0 x_0 *)
-  let lsn := [seq l : LRA_literal dim.+1 <- ls | (0 > l.2 ord0)]%R in
+  let lsn := [seq l : LRA_literal dim.+1 <- ls | (0 > l.2 0)]%R in
     (* - b_0 x_0 <<= b_1 x_1 + ... + b_n x_n *)
   [seq (l.1, tail_tuple l.2)
-    | l : LRA_literal dim.+1 <- ls & l.2 ord0 == 0%R] ++
-  [seq (lp.1 && ln.1, lp.2 ord0 *: tail_tuple ln.2 -
-                      ln.2 ord0 *: tail_tuple lp.2)%R
+    | l : LRA_literal dim.+1 <- ls & l.2 0 == 0]%R ++
+  [seq (lp.1 && ln.1, lp.2 0 *: tail_tuple ln.2 -
+                      ln.2 0 *: tail_tuple lp.2)%R
     | lp : LRA_literal dim.+1 <- lsp, ln : LRA_literal dim.+1 <- lsn]
   (*
        - (a_1 x_1 + ... + a_n x_n) <<= a_0 x_0 /\
@@ -322,40 +322,23 @@ Definition exists_conj_elim
   <=>  0 <= (a_0 b_1 - b_0 a_1) x_1 + ... + (a_0 b_n - b_0 a_n) x_n
   *).
 
-Fixpoint multi_exists_conj_elim dim1 dim2 :
-  seq (LRA_literal (dim1 + dim2)) -> seq (LRA_literal dim2) :=
-  match dim1 with
-    | 0 => fun ls => [seq (l.1, (split_tuple l.2).2) | l <- ls]
-    | dim1'.+1 => fun ls => multi_exists_conj_elim (exists_conj_elim ls)
-  end.
-
 Definition literal_interval dim (I : rat ^ dim) (l : LRA_literal dim.+1) :=
-  let r := (- LRA_interpret_af I (tail_tuple l.2) / l.2 ord0)%R in
-  if l.2 ord0 == 0%R
+  let r := (- LRA_interpret_af I (tail_tuple l.2) / l.2 0)%R in
+  if (l.2 0 == 0)%R
   then if LRA_interpret_literal I (l.1, tail_tuple l.2) then itv1 else itv0
-  else if (0 < l.2 ord0)%R then Interval (BOpen_if (~~ l.1) r) (BInfty _)
+  else if (0 < l.2 0)%R then Interval (BOpen_if (~~ l.1) r) (BInfty _)
                            else Interval (BInfty _) (BOpen_if (~~ l.1) r).
 
 Lemma literal_intervalE dim x0 (I : rat ^ dim) (l : LRA_literal dim.+1) :
   LRA_interpret_literal (cons_tuple x0 I) l = (x0 \in literal_interval I l).
 Proof.
 rewrite /literal_interval /LRA_interpret_literal.
-case: (ltrgtP (l.2 ord0) 0%R) => /= H;
+case: (ltrgtP (l.2 0) 0)%R => /= H;
   try by rewrite
     inE /= ?andbT LRA_af_recl cons_tuple_eq1 tail_cons_tuple
     addrC -lternE negbK addr_lte0r (lter_ndivl_mulr, lter_pdivr_mulr) // mulrC.
 rewrite LRA_af_recl H mul0r add0r tail_cons_tuple.
 by case: (lter l.1 _ _); rewrite -(negbK (_ \in _)) ?(itv1E, itv0E).
-Qed.
-
-Lemma exists_conj_elimP' dim x I (ls : seq (LRA_literal dim.+1)) :
-  all (LRA_interpret_literal (cons_tuple x I)) ls =
-  (x \in \big[itv_intersection/itv1]_(l <- ls)
-           literal_interval I l).
-Proof.
-rewrite -big_all.
-apply (big_rec2 (fun b i => b = (x \in i))) => //= l b i _ -> {b}.
-by rewrite itv_intersectionE literal_intervalE.
 Qed.
 
 Lemma exists_conj_elimP dim I (ls : seq (LRA_literal dim.+1)) :
@@ -365,9 +348,9 @@ Lemma exists_conj_elimP dim I (ls : seq (LRA_literal dim.+1)) :
 Proof.
 have af_decomp (l1 l2 : LRA_literal dim.+1) :
   LRA_interpret_af I
-    (l1.2 ord0 *: tail_tuple l2.2 - l2.2 ord0 *: tail_tuple l1.2)%R =
-  (l1.2 ord0 * LRA_interpret_af I (tail_tuple l2.2) -
-   l2.2 ord0 * LRA_interpret_af I (tail_tuple l1.2))%R.
+    (l1.2 0 *: tail_tuple l2.2 - l2.2 0 *: tail_tuple l1.2)%R =
+  (l1.2 0 * LRA_interpret_af I (tail_tuple l2.2) -
+   l2.2 0 * LRA_interpret_af I (tail_tuple l1.2))%R.
   rewrite /LRA_interpret_af.
   rewrite 2?big_endo ?mulr0 //; try by move => a b; rewrite mulrDr.
   rewrite big_endo //; last apply opprD.
@@ -377,31 +360,32 @@ apply (iffP idP); rewrite /exists_conj_elim all_cat.
 - case/andP; rewrite all_map => H /all_allpairsP H0.
   suff: itv_isnot0
           (\big[itv_intersection/itv1]_(l <- ls) literal_interval I l)
-    by case/itv_isnot0P => /= x H1; exists x; rewrite exists_conj_elimP'.
+    by case/itv_isnot0P => /= x; rewrite -itv_bigIE => H1; exists x;
+      apply/allP => /= l /(allP H1); rewrite literal_intervalE.
   have H1 (l : LRA_literal dim.+1) :
-    l.2 ord0 == 0%R -> l \in ls -> literal_interval I l = itv1
+    (l.2 0 == 0)%R -> l \in ls -> literal_interval I l = itv1
     by move => H1 H2; rewrite /literal_interval H1;
        move: (allP H l); rewrite mem_filter H1 H2 /= => /(_ isT) ->.
   rewrite itv_intersection_isnot0E;
     apply/allP => /= itv /allpairsP [] [] /= l1 l2 [H2 H3 H4]; subst itv.
-  case_eq (l1.2 ord0 == 0%R) => H4;
+  case_eq (l1.2 0 == 0)%R => H4;
     first rewrite (H1 l1) // itv_intersection1i {H4};
-    (case_eq (l2.2 ord0 == 0%R) => H5;
+    (case_eq (l2.2 0 == 0)%R => H5;
      first rewrite (H1 l2) // ?itv_intersectioni1 {H5});
     rewrite /literal_interval ?H4 ?H5;
     do !case: ifP => //=; move => H6 H7; try rewrite -negb_and negbK.
-  + have {H4 H5 H6} H4: (l2.2 ord0 < 0)%R
+  + have {H4 H5 H6} H4: (l2.2 0 < 0)%R
       by rewrite ltrNge ler_eqVlt eq_sym H5 H6.
     move: (H0 l1 l2).
     by rewrite !mem_filter H2 H3 H4 H7 /LRA_interpret_literal /=
                lter_pdivr_mulr // mulrAC lter_ndivl_mulr //
-               !mulNr -addr_lte0r af_decomp !(mulrC (_ ord0)) => ->.
-  + have {H4 H5 H7} H4: (l1.2 ord0 < 0)%R
+               !mulNr -addr_lte0r af_decomp !(mulrC (_ 0))%R => ->.
+  + have {H4 H5 H7} H4: (l1.2 0 < 0)%R
       by rewrite ltrNge ler_eqVlt eq_sym H4 H7.
     move: (H0 l2 l1).
     by rewrite !mem_filter H2 H3 H4 H6 /LRA_interpret_literal /=
                lter_pdivr_mulr // mulrAC lter_ndivl_mulr //
-               !mulNr -addr_lte0r af_decomp !(mulrC (_ ord0)) => ->.
+               !mulNr -addr_lte0r af_decomp !(mulrC (_ 0))%R => ->.
 - case => x H; apply/andP; split.
   + rewrite all_map; apply/allP => /= l; rewrite mem_filter =>
       /andP [/eqP H0 /(allP H)].
@@ -415,46 +399,6 @@ apply (iffP idP); rewrite /exists_conj_elim all_cat.
             tail_cons_tuple !addr_lte0r af_decomp subr_lte0r.
     move => /(lter_pmul2l l2.1) <- /(lter_nmul2l l1.1) <-.
     rewrite !mulrN mulrCA; apply lter_trans.
-Qed.
-
-Lemma multi_exists_conj_elimP
-      dim1 dim2 I (ls : seq (LRA_literal (dim1 + dim2))) :
-  reflect
-    (exists I', all (LRA_interpret_literal (cat_tuple I' I)) ls)
-    (all (LRA_interpret_literal I) (multi_exists_conj_elim ls)).
-Proof.
-elim: dim1 ls => /= [| dim1 IH] ls; last apply/(iffP idP).
-- have HI t: I = @cat_tuple _ 0 dim2 t I.
-    apply/ffunP => /= i; rewrite ffunE; case: splitP => //; first by case.
-    by move => j; rewrite (add0n j) => H; congr fun_of_fin; apply/val_inj.
-  have Hls: ls = [seq (l.1, (split_tuple l.2).2) | l <- ls].
-    elim: ls => // l ls {1}-> /=; congr cons.
-    case: l {ls} => b af /=; congr pair; apply/ffunP => i; rewrite ffunE.
-    by congr fun_of_fin; apply/val_inj => /=; rewrite (add0n i).
-  by apply/(iffP idP) => [H| [x H]]; first exists [ffun => 0%R];
-    move: H; congr (all (LRA_interpret_literal _)).
-- by move/IH => [I'] /exists_conj_elimP [x H];
-    exists (cons_tuple x I'); rewrite cat_cons_tuple.
-- by case => I' H; apply/IH; exists (tail_tuple I'); apply/exists_conj_elimP;
-    exists (I' ord0); rewrite -cat_cons_tuple cons_tail_tuple.
-Qed.
-
-Lemma exists_conj_elim_allT dim (ls : seq (LRA_literal dim.+1)) :
-  all fst ls -> all fst (exists_conj_elim ls).
-Proof.
-move => /allP /= H; rewrite /exists_conj_elim all_cat; apply/andP; split.
-- by rewrite all_map; apply/allP => x; rewrite mem_filter => /andP [] _ /H.
-- by apply/all_allpairsP => x y;
-    rewrite !mem_filter => /andP [] _ /H -> /andP [] _ /H ->.
-Qed.
-
-Lemma multi_exists_conj_elim_allT
-      dim1 dim2 (ls : seq (LRA_literal (dim1 + dim2))) :
-  all fst ls -> all fst (multi_exists_conj_elim ls).
-Proof.
-elim: dim1 ls => //= [| dim1 IH].
-- by elim => //= l ls IH /andP [] -> /IH.
-- by move => ls /exists_conj_elim_allT /IH.
 Qed.
 
 Definition exists_DNF_elim dim (lss : seq (seq (LRA_literal dim.+1))) :
