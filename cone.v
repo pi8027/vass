@@ -175,8 +175,31 @@ apply (iffP idP).
 - by case/H => c H0 ->; apply/Fourier_Motzkin_mP; exists c; rewrite HC H0 eqxx.
 Qed.
 
+Lemma dual_of_poly_cone C : poly_cone C -> fg_cone (dual_cone C).
+Proof.
+case => n normal Hpoly.
+have Hpoly' x: reflect
+            (dual_cone (fun y => exists2 c, posmx c & y = normal^T *m c)%R x)
+            (posmx (normal *m x)%R).
+  apply/(iffP (posmxP _)).
+  - move => H y [c /posmxP H0 ->] {y}; rewrite mulmxA -trmx_mul mxE.
+    by apply/sumr_ge0 => /= i _; apply mulr_ge0; rewrite 1?mxE.
+  - rewrite /dual_cone /= => H i j; move: {H} (H (row i normal)^T%R).
+    rewrite ord1 -trmx_mul -row_mul mxE mxE; apply.
+    exists (delta_mx ord0 i)^T%R.
+    + by apply/posmxP => {j} j k; rewrite !mxE ord1 eqxx; case: eqP.
+    + by rewrite rowE trmx_mul; congr mulmx.
+apply (@Fg_cone _ _ normal^T)%R => y; split.
+- move => H0.
+  admit.
+- case => c /posmxP H -> {y} x /Hpoly /posmxP H0.
+  rewrite trmx_mul trmxK -mulmxA mxE.
+  by apply sumr_ge0 => /= i _; apply mulr_ge0; rewrite // mxE.
+Admitted.
+
 Lemma duality_converse C : poly_cone C -> fg_cone C.
 Proof.
+move/dual_of_poly_cone/duality_direct/dual_of_poly_cone.
 Abort.
 
 End ConeDef.
