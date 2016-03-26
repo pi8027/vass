@@ -1,5 +1,6 @@
 Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import all_ssreflect all_algebra.
+From mathcomp Require Import all_ssreflect all_fingroup all_algebra zmodp.
+Import GroupScope GRing.Theory Num.Theory.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -46,7 +47,7 @@ Definition cons_tuple (h : A) (t : A ^ n) : A ^ n.+1 :=
 
 Definition tail_tuple (t : A ^ n.+1) : A ^ n := [ffun m => t (rshift 1 m)].
 
-Lemma cons_tuple_eq1 (h : A) (t : A ^ n) : cons_tuple h t ord0 = h.
+Lemma cons_tuple_eq1 (h : A) (t : A ^ n) : cons_tuple h t 0%R = h.
 Proof. by rewrite /cons_tuple ffunE; case: splitP. Qed.
 
 Lemma cons_tuple_eq2 (h : A) (t : A ^ n) (i : 'I_n) :
@@ -59,17 +60,17 @@ Proof. by rewrite /tail_tuple ffunE. Qed.
 Lemma tail_cons_tuple (h : A) (t : A ^ n) : tail_tuple (cons_tuple h t) = t.
 Proof. by apply/ffunP => /= i; rewrite !ffunE split_rshift. Qed.
 
-Lemma cons_tail_tuple (t : A ^ n.+1) : cons_tuple (t ord0) (tail_tuple t) = t.
+Lemma cons_tail_tuple (t : A ^ n.+1) : cons_tuple (t 0%R) (tail_tuple t) = t.
 Proof.
-  apply/ffunP => /= i; rewrite !ffunE; case: splitP => j Hj.
-  - by congr fun_of_fin; apply/val_inj; rewrite /= {}Hj; case: j => -[].
-  - by rewrite ffunE; congr fun_of_fin; apply/val_inj.
+apply/ffunP => /= i; rewrite !ffunE; case: splitP => j Hj.
+- by congr fun_of_fin; apply/val_inj; rewrite /= {}Hj; case: j => -[].
+- by rewrite ffunE; congr fun_of_fin; apply/val_inj.
 Qed.
 
 Lemma cons_tuple_const (x : A) : cons_tuple x [ffun => x] = [ffun => x].
 Proof.
-  apply/ffunP => /= i; rewrite /cons_tuple !ffunE.
-  by case: splitP => //= i' _; rewrite ffunE.
+apply/ffunP => /= i; rewrite /cons_tuple !ffunE.
+by case: splitP => //= i' _; rewrite ffunE.
 Qed.
 
 End cons_tuple.
@@ -79,7 +80,7 @@ Lemma cat_cons_tuple (A : Type) n m (h : A) (t1 : A ^ n) (t2 : A ^ m) :
 Proof.
 apply/esym/ffunP => /= i; rewrite !ffunE.
 case: splitP => j Hj; last case: splitP => k Hk.
-- suff ->: i = (lshift m ord0) by rewrite split_lshift cons_tuple_eq1.
+- suff ->: i = (lshift m 0%R) by rewrite split_lshift cons_tuple_eq1.
   by apply/val_inj => /=; rewrite {}Hj; case: j => -[].
 - rewrite !ffunE.
   have: j < n by rewrite -add1n -Hj {}Hk; case: k.
@@ -97,8 +98,8 @@ Lemma cons_tuple_map (A B : Type) (f : A -> B) n (h : A) (t : 'I_n -> A) :
   [ffun i => f ((cons_tuple h [ffun i => t i]) i)] =
   cons_tuple (f h) [ffun i => f (t i)].
 Proof.
-  apply/ffunP => /= i; rewrite !ffunE.
-  by case: splitP => //= i' _; rewrite !ffunE.
+apply/ffunP => /= i; rewrite !ffunE.
+by case: splitP => //= i' _; rewrite !ffunE.
 Qed.
 
 Lemma all_allpairsP
@@ -106,16 +107,16 @@ Lemma all_allpairsP
   reflect (forall (i : S) (j : T), i \in s -> j \in t -> g (f i j))
           (all g [seq f i j | i <- s, j <- t]).
 Proof.
-  apply (iffP allP).
-  - by move => H i j H0 H1; apply/H/allpairsP; exists (i, j).
-  - by move => H x /allpairsP [] [i j] [] /= H0 H1 ->; apply H.
+apply (iffP allP).
+- by move => H i j H0 H1; apply/H/allpairsP; exists (i, j).
+- by move => H x /allpairsP [] [i j] [] /= H0 H1 ->; apply H.
 Qed.
 
 Lemma all_enum (T : finType) (P : pred T) : all P (enum T) = [forall i, P i].
 Proof.
-  apply/idP; case: ifP; first by move/forallP => H; apply/allP.
-  by move/negP => H /allP H0; apply: H;
-    apply/forallP => x; apply: H0; rewrite mem_enum.
+apply/idP; case: ifP; first by move/forallP => H; apply/allP.
+by move/negP => H /allP H0; apply: H;
+  apply/forallP => x; apply: H0; rewrite mem_enum.
 Qed.
 
 (******************************************************************************)
@@ -150,26 +151,26 @@ Definition range_enum : seq range :=
 
 Lemma range_enum_uniq : uniq range_enum.
 Proof.
-  rewrite pmap_sub_uniq // cat_uniq !map_inj_in_uniq;
-    first (case: i => i'; case: k => k'; rewrite ?iota_uniq // andTb andbT).
-  - by rewrite -all_predC /=; elim: map.
-  - rewrite -all_predC all_map.
-    by elim: (iota 0 k'.+1) => //= n ns ->; rewrite andbT !inE /=; elim: iota.
-  - by move => /= x y _ _ [].
-  - by move => /= x y _ _ [].
+rewrite pmap_sub_uniq // cat_uniq !map_inj_in_uniq;
+  first (case: i => i'; case: k => k'; rewrite ?iota_uniq // andTb andbT).
+- by rewrite -all_predC /=; elim: map.
+- rewrite -all_predC all_map.
+  by elim: (iota 0 k'.+1) => //= n ns ->; rewrite andbT !inE /=; elim: iota.
+- by move => /= x y _ _ [].
+- by move => /= x y _ _ [].
 Qed.
 
 Lemma mem_range_enum r : r \in range_enum.
 Proof.
-  rewrite -(mem_map val_inj) /= /range_enum.
-  case: r => /= j /andP [H H0]; rewrite pmap_filter;
-    last by move => j'; case: insubP.
-  rewrite mem_filter mem_cat; apply/andP; split;
-    first by case: insubP => //; rewrite H H0.
-  apply/orP; case: j H H0 => j' H H0; [right | left];
-    (rewrite mem_map; last by move => ? ? []).
-  - by case: k H0 => // k' H0; rewrite (mem_iota 0 k'.+1).
-  - by case: i H => // i' H; rewrite (mem_iota 0 i'.+1) leq0n ltnS.
+rewrite -(mem_map val_inj) /= /range_enum.
+case: r => /= j /andP [H H0]; rewrite pmap_filter;
+  last by move => j'; case: insubP.
+rewrite mem_filter mem_cat; apply/andP; split;
+  first by case: insubP => //; rewrite H H0.
+apply/orP; case: j H H0 => j' H H0; [right | left];
+  (rewrite mem_map; last by move => ? ? []).
+- by case: k H0 => // k' H0; rewrite (mem_iota 0 k'.+1).
+- by case: i H => // i' H; rewrite (mem_iota 0 i'.+1) leq0n ltnS.
 Qed.
 
 Definition range_finMixin :=
@@ -210,27 +211,27 @@ Proof. by rewrite addrC -{1}(opprK x) subr_lte0r. Qed.
 Lemma lter_trans b1 b2 r1 r2 r3 :
   lter b1 r1 r2 -> lter b2 r2 r3 -> lter (b1 && b2) r1 r3.
 Proof.
-  case: b1; case: b2 => /=.
-  apply ler_trans. apply ler_lt_trans. apply ltr_le_trans. apply ltr_trans.
+case: b1; case: b2 => /=.
+apply ler_trans. apply ler_lt_trans. apply ltr_le_trans. apply ltr_trans.
 Qed.
 
 Lemma lter_andb b1 b2 r1 r2 :
   lter (b1 && b2) r1 r2 = lter b1 r1 r2 && lter b2 r1 r2.
 Proof.
-  by case: b1; case: b2 => /=; rewrite ?ler_eqVlt;
-    case: (_ < _)%R; rewrite ?(orbT, orbF, andbF, andbb).
+by case: b1; case: b2 => /=; rewrite ?ler_eqVlt;
+  case: (_ < _)%R; rewrite ?(orbT, orbF, andbF, andbb).
 Qed.
 
 Lemma lter_orb b1 b2 r1 r2 :
   lter (b1 || b2) r1 r2 = lter b1 r1 r2 || lter b2 r1 r2.
 Proof.
-  by case: b1; case: b2 => /=; rewrite ?ler_eqVlt;
-    case: (_ < _)%R; rewrite ?(orbT, orbF, orbb).
+by case: b1; case: b2 => /=; rewrite ?ler_eqVlt;
+  case: (_ < _)%R; rewrite ?(orbT, orbF, orbb).
 Qed.
 
 Lemma lter_imply b1 b2 r1 r2 : b1 ==> b2 -> lter b1 r1 r2 -> lter b2 r1 r2.
 Proof.
-  by case: b1; case: b2 => //= _; rewrite ler_eqVlt => ->; rewrite orbT.
+by case: b1; case: b2 => //= _; rewrite ler_eqVlt => ->; rewrite orbT.
 Qed.
 
 Lemma lter_pmul2l b x : (0 < x)%R -> {mono *%R x : y z / lter b y z}.
@@ -244,20 +245,6 @@ Proof. by case: b => /= H y z; rewrite lter_nmul2l. Qed.
 
 Lemma lter_nmul2r b x : (x < 0)%R -> {mono *%R^~ x : y z /~ lter b y z}.
 Proof. by case: b => /= H y z; rewrite lter_nmul2r. Qed.
-
-(*
-Lemma lter_wpmul2l b x : (0 < x)%R -> {homo *%R x : y z / lter b y z}.
-Proof. by move/(lter_pmul2l b)/mono2W. Qed.
-
-Lemma lter_wpmul2r b x : (0 < x)%R -> {homo *%R^~ x : y z / lter b y z}.
-Proof. by move/(lter_pmul2r b)/mono2W. Qed.
-
-Lemma lter_wnmul2l b x : (x < 0)%R -> {homo *%R x : y z /~ lter b y z}.
-Proof. by move/(lter_nmul2l b)/mono2W. Qed.
-
-Lemma lter_wnmul2r b x : (x < 0)%R -> {homo *%R^~ x : y z /~ lter b y z}.
-Proof. by move/(lter_nmul2r b)/mono2W. Qed.
-*)
 
 Lemma lter_add2l b x : {mono +%R x : y z / lter b y z}.
 Proof. by case: b => /= y z; rewrite lter_add2. Qed.
@@ -328,9 +315,9 @@ Definition eq_itv_bound (b1 b2 : itv_bound) : bool :=
 
 Lemma eq_itv_boundP : Equality.axiom eq_itv_bound.
 Proof.
-  move => b1 b2; apply: (iffP idP).
-  - by move: b1 b2 => [a x |] [b y |] => //= /andP [] /eqP -> /eqP ->.
-  - by move => <-; case: b1 => //= a x; rewrite !eqxx.
+move => b1 b2; apply: (iffP idP).
+- by move: b1 b2 => [a x |] [b y |] => //= /andP [] /eqP -> /eqP ->.
+- by move => <-; case: b1 => //= a x; rewrite !eqxx.
 Qed.
 
 Canonical itv_bound_eqMixin := EqMixin eq_itv_boundP.
@@ -342,9 +329,9 @@ Definition eqitv (i1 i2 : interval) : bool :=
 
 Lemma eqitvP : Equality.axiom eqitv.
 Proof.
-  move => i1 i2; apply: (iffP idP).
-  - by move: i1 i2 => [l1 u1] [l2 u2] => //= /andP [] /eqP -> /eqP ->.
-  - by move => <-; case: i1 => /= l u; rewrite !eqxx.
+move => i1 i2; apply: (iffP idP).
+- by move: i1 i2 => [l1 u1] [l2 u2] => //= /andP [] /eqP -> /eqP ->.
+- by move => <-; case: i1 => /= l u; rewrite !eqxx.
 Qed.
 
 Canonical interval_eqMixin := EqMixin eqitvP.
@@ -374,42 +361,42 @@ Definition itv_leub (u1 u2 : itv_bound) : bool :=
 
 Lemma itv_lelb_trans : transitive itv_lelb.
 Proof.
-  move => [lb1 lr1 |] [lb2 lr2 |] [lb3 lr3 |] //=.
-  do 2 (let H := fresh "H" in
-        case/orP; first case/andP => /eqP H; subst; move => H).
-  - by rewrite eqxx /=; move: lb1 lb2 lb3 H H0 => [] [] [].
-  - by rewrite H0 orbT.
-  - by rewrite H orbT.
-  - by rewrite (ltr_trans H H0) orbT.
+move => [lb1 lr1 |] [lb2 lr2 |] [lb3 lr3 |] //=.
+do 2 (let H := fresh "H" in
+      case/orP; first case/andP => /eqP H; subst; move => H).
+- by rewrite eqxx /=; move: lb1 lb2 lb3 H H0 => [] [] [].
+- by rewrite H0 orbT.
+- by rewrite H orbT.
+- by rewrite (ltr_trans H H0) orbT.
 Qed.
 
 Lemma itv_leub_trans : transitive itv_leub.
 Proof.
-  move => [ub1 ur1 |] [ub2 ur2 |] [ub3 ur3 |] //=.
-  do 2 (let H := fresh "H" in
-        case/orP; first case/andP => /eqP H; subst; move => H).
-  - by rewrite eqxx /=; move: ub1 ub2 ub3 H H0 => [] [] [].
-  - by rewrite H0 orbT.
-  - by rewrite H orbT.
-  - by rewrite (ltr_trans H H0) orbT.
+move => [ub1 ur1 |] [ub2 ur2 |] [ub3 ur3 |] //=.
+do 2 (let H := fresh "H" in
+      case/orP; first case/andP => /eqP H; subst; move => H).
+- by rewrite eqxx /=; move: ub1 ub2 ub3 H H0 => [] [] [].
+- by rewrite H0 orbT.
+- by rewrite H orbT.
+- by rewrite (ltr_trans H H0) orbT.
 Qed.
 
 Lemma eq_itv_lelb (l1 l2 : itv_bound) :
   l1 == l2 = (itv_lelb l1 l2 && itv_lelb l2 l1).
 Proof.
-  move: l1 l2 => [lb1 lr1 |] [lb2 lr2 |] => //=.
-  by move: lb1 lb2 => [] [];
-    rewrite !(andbT, andbF) -!ler_eqVlt /=
-            (esym (eqr_le _ _), ltr_le_asym, ler_lt_asym).
+move: l1 l2 => [lb1 lr1 |] [lb2 lr2 |] => //=.
+by move: lb1 lb2 => [] [];
+  rewrite !(andbT, andbF) -!ler_eqVlt /=
+          (esym (eqr_le _ _), ltr_le_asym, ler_lt_asym).
 Qed.
 
 Lemma eq_itv_leub (u1 u2 : itv_bound) :
   u1 == u2 = (itv_leub u1 u2 && itv_leub u2 u1).
 Proof.
-  move: u1 u2 => [ub1 ur1 |] [ub2 ur2 |] => //=.
-  by move: ub1 ub2 => [] [];
-    rewrite !(andbT, andbF) -!ler_eqVlt /=
-            (esym (eqr_le _ _), ltr_le_asym, ler_lt_asym).
+move: u1 u2 => [ub1 ur1 |] [ub2 ur2 |] => //=.
+by move: ub1 ub2 => [] [];
+  rewrite !(andbT, andbF) -!ler_eqVlt /=
+          (esym (eqr_le _ _), ltr_le_asym, ler_lt_asym).
 Qed.
 
 Definition itv_intersection (i1 i2 : interval) : interval :=
@@ -459,66 +446,66 @@ Arguments itv_subset {R} i1 i2.
 Lemma itv_isnot0P (R : numFieldType) (i : interval R) :
   reflect (exists x, x \in i) (itv_isnot0 i).
 Proof.
-  move: i => [] [lb lr |] [ub ur |] /=; apply (iffP idP) => //.
-  - move => H; exists ((lr + ur) / 2%:R)%R; rewrite inE -!lternE.
-    by rewrite lter_pdivr_mulr ?lter_pdivl_mulr ?pmulrn_lgt0 ?ltr01 //
-               !mulrnAr !mulr1 /GRing.natmul lter_add2l lter_add2r
-               -lter_andb -negb_or.
-  - by case => x; rewrite inE -!lternE negb_or => /andP []; apply lter_trans.
-  - move => _; exists (lr + 1)%R;
-      rewrite inE -lternE andbT -{1}(addr0 lr) lter_add2l.
-    by case: lb => //=; rewrite (ltr01, ler01).
-  - move => _; exists (ur - 1)%R;
-      rewrite inE -lternE -{2}(subr0 ur) lter_add2l lter_opp2 /=.
-    by case: ub => //=; rewrite (ltr01, ler01).
-  - by move => _; exists 0%R; rewrite inE.
+move: i => [] [lb lr |] [ub ur |] /=; apply (iffP idP) => //.
+- move => H; exists ((lr + ur) / 2%:R)%R; rewrite inE -!lternE.
+  by rewrite lter_pdivr_mulr ?lter_pdivl_mulr ?pmulrn_lgt0 ?ltr01 //
+             !mulrnAr !mulr1 /GRing.natmul lter_add2l lter_add2r
+             -lter_andb -negb_or.
+- by case => x; rewrite inE -!lternE negb_or => /andP []; apply lter_trans.
+- move => _; exists (lr + 1)%R;
+    rewrite inE -lternE andbT -{1}(addr0 lr) lter_add2l.
+  by case: lb => //=; rewrite (ltr01, ler01).
+- move => _; exists (ur - 1)%R;
+    rewrite inE -lternE -{2}(subr0 ur) lter_add2l lter_opp2 /=.
+  by case: ub => //=; rewrite (ltr01, ler01).
+- by move => _; exists 0%R; rewrite inE.
 Qed.
 
 Lemma itv_is0P (R : numFieldType) (i : interval R) :
   reflect (forall x, x \notin i) (itv_is0 i).
 Proof.
-  apply (iffP negP).
-  - by move => H x; apply/negP => H0; apply/H/itv_isnot0P; exists x.
-  - by move => H /itv_isnot0P [x H0]; move: (H x); rewrite H0.
+apply (iffP negP).
+- by move => H x; apply/negP => H0; apply/H/itv_isnot0P; exists x.
+- by move => H /itv_isnot0P [x H0]; move: (H x); rewrite H0.
 Qed.
 
 Lemma itv_lelb_total (R : realDomainType) : total (@itv_lelb R).
 Proof.
-  move => [lb1 lr1 |] [lb2 lr2 |] => //=.
-  by move: lb1 lb2 => [] []; case: (ltrgtP lr1 lr2).
+move => [lb1 lr1 |] [lb2 lr2 |] => //=.
+by move: lb1 lb2 => [] []; case: (ltrgtP lr1 lr2).
 Qed.
 
 Lemma itv_leub_total (R : realDomainType) : total (@itv_leub R).
 Proof.
-  move => [ub1 ur1 |] [ub2 ur2 |] => //=.
-  by move: ub1 ub2 => [] []; case: (ltrgtP ur1 ur2).
+move => [ub1 ur1 |] [ub2 ur2 |] => //=.
+by move: ub1 ub2 => [] []; case: (ltrgtP ur1 ur2).
 Qed.
 
 Lemma itv_intersectionC (R : realDomainType) :
   commutative (@itv_intersection R).
 Proof.
-  move => [l1 u1] [l2 u2] /=; congr Interval; do 2 case: ifP => //=.
-  - by move => H H0; apply/eqP; rewrite eq_itv_lelb H H0.
-  - by case/orP: (itv_lelb_total l1 l2) => ->.
-  - by move => H H0; apply/eqP; rewrite eq_itv_leub H H0.
-  - by case/orP: (itv_leub_total u1 u2) => ->.
+move => [l1 u1] [l2 u2] /=; congr Interval; do 2 case: ifP => //=.
+- by move => H H0; apply/eqP; rewrite eq_itv_lelb H H0.
+- by case/orP: (itv_lelb_total l1 l2) => ->.
+- by move => H H0; apply/eqP; rewrite eq_itv_leub H H0.
+- by case/orP: (itv_leub_total u1 u2) => ->.
 Qed.
 
 Lemma itv_intersectionA (R : realDomainType) :
   associative (@itv_intersection R).
 Proof.
-  move => [l1 u1] [l2 u2] [l3 u3] /=; congr Interval;
-    do ! case: ifP => //=; try congruence.
-  - by move => H H0; rewrite (itv_lelb_trans H H0).
-  - move => H H0 H1 _; apply/eqP; rewrite eq_itv_lelb H0 /=.
-    move: (itv_lelb_total l1 l2); rewrite {}H /= => H.
-    move: (itv_lelb_total l2 l3); rewrite {}H1 /= => H1.
-    apply (itv_lelb_trans H1 H).
-  - by move => H H0 H1; rewrite (itv_leub_trans H H1) in H0.
-  - move => H H0 _ H1; apply/eqP; rewrite eq_itv_leub H1 /=.
-    move: (itv_leub_total u1 u2); rewrite {}H /= => H.
-    move: (itv_leub_total u2 u3); rewrite {}H0 /= => H0.
-    apply (itv_leub_trans H0 H).
+move => [l1 u1] [l2 u2] [l3 u3] /=; congr Interval;
+  do ! case: ifP => //=; try congruence.
+- by move => H H0; rewrite (itv_lelb_trans H H0).
+- move => H H0 H1 _; apply/eqP; rewrite eq_itv_lelb H0 /=.
+  move: (itv_lelb_total l1 l2); rewrite {}H /= => H.
+  move: (itv_lelb_total l2 l3); rewrite {}H1 /= => H1.
+  apply (itv_lelb_trans H1 H).
+- by move => H H0 H1; rewrite (itv_leub_trans H H1) in H0.
+- move => H H0 _ H1; apply/eqP; rewrite eq_itv_leub H1 /=.
+  move: (itv_leub_total u1 u2); rewrite {}H /= => H.
+  move: (itv_leub_total u2 u3); rewrite {}H0 /= => H0.
+  apply (itv_leub_trans H0 H).
 Qed.
 
 Canonical itv_intersection_monoid (R : realDomainType) :=
@@ -532,42 +519,42 @@ Canonical itv_intersection_comoid (R : realDomainType) :=
 Lemma itv_intersectionE (R : realDomainType) (x : R) (i1 i2 : interval R) :
   x \in itv_intersection i1 i2 = (x \in i1) && (x \in i2).
 Proof.
-  move: i1 i2 => [l1 u1] [l2 u2]; rewrite !inE /=.
-  by rewrite -andbA [X in _ = (_ && X)]andbCA andbA; congr andb;
-    [move: {u1 u2} l1 l2 | move: {l1 l2} u1 u2];
-    move => [[] r1 |] [[] r2 |] //=;
-    rewrite (andbT, andbF) //= -?ler_eqVlt;
-    (case: ifP; last move/negbT; rewrite -?(ltrNge, lerNgt) => H);
-    match goal with
-      |- ?p = _ => case_eq p; last move/negbT;
-                   rewrite -/(is_true _) -?(ltrNge, lerNgt) => H0
-    end;
-    apply/esym; rewrite ?(andbT, andbF) //= -/(is_true _);
-    match goal with
-      | H : is_true (_ ?a ?b), H0 : is_true (_ ?b ?c) |- is_true (_ ?a ?c) =>
-      move: (ler_trans H H0) || move: (ler_lt_trans H H0) ||
-      move: (ltr_le_trans H H0) || move: (ltr_trans H H0)
-    end;
-    rewrite // ler_eqVlt => ->; rewrite orbT.
+move: i1 i2 => [l1 u1] [l2 u2]; rewrite !inE /=.
+by rewrite -andbA [X in _ = (_ && X)]andbCA andbA; congr andb;
+  [move: {u1 u2} l1 l2 | move: {l1 l2} u1 u2];
+  move => [[] r1 |] [[] r2 |] //=;
+  rewrite (andbT, andbF) //= -?ler_eqVlt;
+  (case: ifP; last move/negbT; rewrite -?(ltrNge, lerNgt) => H);
+  match goal with
+    |- ?p = _ => case_eq p; last move/negbT;
+                 rewrite -/(is_true _) -?(ltrNge, lerNgt) => H0
+  end;
+  apply/esym; rewrite ?(andbT, andbF) //= -/(is_true _);
+  match goal with
+    | H : is_true (_ ?a ?b), H0 : is_true (_ ?b ?c) |- is_true (_ ?a ?c) =>
+    move: (ler_trans H H0) || move: (ler_lt_trans H H0) ||
+    move: (ltr_le_trans H H0) || move: (ltr_trans H H0)
+  end;
+  rewrite // ler_eqVlt => ->; rewrite orbT.
 Qed.
 
 Lemma itv_eqP (R : numFieldType) (i1 i2 : interval R) :
   reflect (forall x, x \in i1 <-> x \in i2) (itv_eq i1 i2).
 Proof.
-  apply (iffP idP).
-  - case/orP; first by move/eqP => ->.
-    by case/andP => /itv_isnot0P H /itv_isnot0P H0 x;
-      split => H1; [case: H | case: H0]; exists x.
-  - move => H; rewrite /itv_eq orbC -negb_or -implybE; apply/implyP.
-    move: i1 i2 H.
-    suff H0 (i1' i2' : interval R) :
-      (forall x, x \in i1' <-> x \in i2') -> itv_isnot0 i1' -> i1' == i2'
-      by move => i1 i2 H /orP [];
-        last rewrite eq_sym; apply: H0 => // => x; apply iff_sym.
-    move: i1' i2' => [l1 u1] [l2 u2] H H0; apply/eqP; congr Interval;
-      [move: l1 l2 H H0 | move: u1 u2 H H0];
-      move => [b1 r1 |] [b2 r2 |] //= H H0.
-    + case: u1 H H0 => [ub1 ur1 |] //=.
+apply (iffP idP).
+- case/orP; first by move/eqP => ->.
+  by case/andP => /itv_isnot0P H /itv_isnot0P H0 x;
+    split => H1; [case: H | case: H0]; exists x.
+- move => H; rewrite /itv_eq orbC -negb_or -implybE; apply/implyP.
+  move: i1 i2 H.
+  suff H0 (i1' i2' : interval R) :
+    (forall x, x \in i1' <-> x \in i2') -> itv_isnot0 i1' -> i1' == i2'
+    by move => i1 i2 H /orP [];
+      last rewrite eq_sym; apply: H0 => // => x; apply iff_sym.
+  move: i1' i2' => [l1 u1] [l2 u2] H H0; apply/eqP; congr Interval;
+    [move: l1 l2 H H0 | move: u1 u2 H H0];
+    move => [b1 r1 |] [b2 r2 |] //= H H0.
+  + case: u1 H H0 => [ub1 ur1 |] //=.
 Abort.
 
 Lemma itv_subsetP (R : realFieldType) (i1 i2 : interval R) :
@@ -619,6 +606,15 @@ Proof.
 Qed.
 
 Lemma itv_bigIE
+      T (R : realDomainType) (x : R) (r : seq T) (f : T -> interval R) :
+  all (fun i => x \in f i) r = (x \in \big[itv_intersection/itv1]_(i <- r) f i).
+Proof.
+rewrite -big_all.
+apply (big_rec2 (fun b i => b = (x \in i))) => //= l b i _ -> {b}.
+by rewrite itv_intersectionE.
+Qed.
+
+Lemma itv_bigIE'
       (I : eqType) (R : realDomainType) (r : seq I) (f : I -> interval R) :
   0 < size r ->
   exists i j, i \in r /\ j \in r /\
@@ -653,18 +649,7 @@ Proof.
     by rewrite !big_cons itv_intersectionA itv_intersectionE => /andP [].
   - move/negP => H0; apply/esym/negP => /allP H; apply: H0.
     case: (ltnP 0 (size r)).
-    + case/(itv_bigIE f) => i [j] [H0] [H1] ->.
+    + case/(itv_bigIE' f) => i [j] [H0] [H1] ->.
       by apply/H/allpairsP; exists (i, j); do ! split.
     + by case: r {H} => // _; rewrite big_nil.
 Qed.
-
-(******************************************************************************)
-(*  extensions for matrix                                                     *)
-(******************************************************************************)
-
-Lemma trmxD (R : zmodType) m n : {morph @trmx R m n : x y / (x + y)%R}.
-Proof. by move => x y; apply/matrixP => i j; rewrite !mxE. Qed.
-
-Lemma trmx_scale (R : ringType) m n (a : R) :
-  {morph @trmx _ m n : x / (a *: x)%R}.
-Proof. by move => x; apply/matrixP => i j; rewrite !mxE. Qed.
