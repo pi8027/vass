@@ -18,6 +18,22 @@ Proof. by move => x y /(f_equal val) /= /val_inj. Qed.
 Lemma rshift_inj (m n : nat) : injective (@rshift m n).
 Proof. by move => x y /(f_equal val) /= /addnI /val_inj. Qed.
 
+Lemma lshift_rshift_neq (m n : nat) i j : lshift m i <> rshift n j.
+Proof.
+by move/(f_equal val); apply/eqP; rewrite neq_ltn (ltn_addr _ (ltn_ord i)).
+Qed.
+
+Lemma rshift_lshift_neq (m n : nat) i j : rshift n j <> lshift m i.
+Proof. by move/esym/lshift_rshift_neq. Qed.
+
+Lemma enum_rank_in_inj
+      (T : finType) (x y : T) (A : pred T) (H : x \in A) (H0 : y \in A) :
+  enum_rank_in H x = enum_rank_in H0 y -> x = y.
+Proof.
+by move => H1;
+  rewrite -(enum_rankK_in (A := A) H H) -(enum_rankK_in (A := A) H0 H0) H1.
+Qed.
+
 Section cons_tuple.
 
 Variable (A : Type) (n : nat).
