@@ -12,6 +12,12 @@ Proof. by apply: unsplitK (inl i). Qed.
 Lemma split_rshift (m n : nat) (i : 'I_n) : split (rshift m i) = inr i.
 Proof. by apply: unsplitK (inr i). Qed.
 
+Lemma lshift_inj (m n : nat) : injective (@lshift m n).
+Proof. by move => x y /(f_equal val) /= /val_inj. Qed.
+
+Lemma rshift_inj (m n : nat) : injective (@rshift m n).
+Proof. by move => x y /(f_equal val) /= /addnI /val_inj. Qed.
+
 Section cons_tuple.
 
 Variable (A : Type) (n : nat).
