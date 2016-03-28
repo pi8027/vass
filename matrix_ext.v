@@ -18,6 +18,20 @@ Lemma trmx_scale (R : ringType) m n (a : R) :
   {morph @trmx _ m n : x / (a *: x)}%R.
 Proof. by move => x; apply/matrixP => i j; rewrite !mxE. Qed.
 
+Lemma row_permI (R : Type) (m n : nat) (p : 'S_m) :
+  injective (@row_perm R m n p).
+Proof.
+by move => mx1 mx2 /(f_equal (row_perm p^-1));
+   rewrite -!row_permM mulVg !row_perm1.
+Qed.
+
+Lemma col_permI (R : Type) (m n : nat) (p : 'S_n) :
+  injective (@col_perm R m n p).
+Proof.
+by move => mx1 mx2 /(f_equal (col_perm p^-1));
+   rewrite -!col_permM mulVg !col_perm1.
+Qed.
+
 (* pointwise comparison for matrices *)
 
 Section lermx.
@@ -92,6 +106,16 @@ apply/andP; case: eqP.
   by move: (H0 i j) (H1 i j); rewrite !mxE oppr_ge0 eqr_le => -> ->.
 Qed.
 
+Lemma lermx_trmx m n (mx1 mx2 : 'M_(m, n)) :
+  ((mx1^T <=m mx2^T) = (mx1 <=m mx2))%R.
+Proof.
+by apply/lermxP; case: lermxP;
+  [move => H | move => H0 H; apply H0] => i j; move: (H j i); rewrite !mxE.
+Qed.
+
+Lemma posmx_trmx m n (mx : 'M_(m, n)) : posmx mx^T = posmx mx.
+Proof. by rewrite /posmx -trmx0 lermx_trmx. Qed.
+
 End lermx.
 
 Notation "A <=m B" := (lermx A B) (at level 70, no associativity) : ring_scope.
@@ -110,11 +134,18 @@ Lemma filter_mxE1 i : row i filter_mx = row (enum_val i) A.
 Proof. by rewrite rowK. Qed.
 
 Lemma filter_mxE2 (i : 'I_m) (H : P (row i A)) :
-   row i A = row (enum_rank_in H i) filter_mx.
+  row i A = row (enum_rank_in H i) filter_mx.
 Proof. by rewrite rowK enum_rankK_in. Qed.
 
+Lemma filter_mxE1' i j : filter_mx i j = A (enum_val i) j.
+Proof. by rewrite !mxE. Qed.
+
+Lemma filter_mxE2' (i : 'I_m) (j : 'I_n) (H : P (row i A)) :
+  A i j = filter_mx (enum_rank_in H i) j.
+Proof. by rewrite !mxE enum_rankK_in. Qed.
+
 Lemma filter_mxT i : P (row i filter_mx).
-Proof. by rewrite rowK; move: (enum_valP i); rewrite unfold_in. Qed.
+Proof. by rewrite rowK; move: (enum_valP i). Qed.
 
 End filter_matrix.
 
@@ -132,6 +163,55 @@ Definition Pneg (r : 'rV[R]_(1 + n)) := (r 0 0 < 0)%R.
 Definition subA0 := filter_mx P0 A.
 Definition subApos := filter_mx Ppos A.
 Definition subAneg := filter_mx Pneg A.
+
+Lemma rowsE : m = #|[pred i | P0 (row i A)]| +
+                  #|[pred i | Ppos (row i A)]| +
+                  #|[pred i | Pneg (row i A)]|.
+Proof.
+rewrite -cardUI.
+have/eq_card0 ->:
+    [predI [pred i | P0 (row i A)] & [pred i | Ppos (row i A)]] =i pred0
+  by move => /= i; rewrite !inE /P0 /Ppos ltr_def andbA andbN.
+have/eq_card ->:
+    [predU [pred i | P0 (row i A)] & [pred i | Ppos (row i A)]] =i
+    [pred i | 0 <= (row i A) 0 0]%R
+  by move => /= i; rewrite !inE ler_eqVlt eq_sym.
+rewrite addn0 -cardUI.
+have/eq_card0 ->:
+    [predI [pred i | 0 <= row i A 0 0]%R & [pred i | Pneg (row i A)]] =i pred0
+  by move => /= i; rewrite !inE /Pneg ler_lt_asym.
+have/eq_cardT ->:
+    [predU [pred i | 0 <= row i A 0 0]%R & [pred i | Pneg (row i A)]] =i predT
+  by move => /= i; rewrite !inE; case: (lerP 0 (row i A 0 0))%R.
+by rewrite -cardE card_ord.
+Qed.
+
+Definition nf_perm (i : 'I_m) : 'I_m :=
+  cast_ord (esym rowsE)
+  match ltrgt0P (row i A 0 0)%R with
+  | ComparerEq0 H => lshift _ (lshift _ (enum_rank_in (introT eqP H) i))
+  | ComparerGt0 H => lshift _ (rshift _ (enum_rank_in H i))
+  | ComparerLt0 H => rshift _ (enum_rank_in H i)
+  end.
+
+Lemma nf_permI : injective nf_perm.
+Proof.
+move => i j /cast_ord_inj.
+by case (ltrgt0P (row i A 0 0)%R) => H; case (ltrgt0P (row j A 0 0)%R) => H0;
+  do ?(move/lshift_inj || move/rshift_inj);
+  move/enum_rank_in_inj || move/lshift_rshift_neq || move/rshift_lshift_neq.
+Qed.
+
+Lemma nf_perm_eq :
+  row_perm (perm nf_permI)^-1 A =
+  castmx (esym rowsE, erefl) (col_mx (col_mx subA0 subApos) subAneg).
+Proof.
+apply row_permI with (perm nf_permI); rewrite -row_permM mulgV row_perm1.
+apply/matrixP => i j;
+  rewrite !mxE castmxE permE /= /nf_perm cast_ord_comp !cast_ord_id.
+by case (ltrgt0P (row i A 0 0)%R) => H /=;
+  rewrite ?(col_mxEu, col_mxEd) !mxE enum_rankK_in // inE /P0 H.
+Qed.
 
 Definition fm :
   'M[R]_(#|[pred i | P0 (row i A)]| +
@@ -183,8 +263,8 @@ have {H_A0E} H_decomp_ineq x0:
   rewrite (H_A0E x0); apply/posmx_mulP; case: and3P;
     last by move => H H0; apply: H; split;
             apply/posmx_mulP => i j; move: H0; rewrite filter_mxE1.
-  by case => H H0 H1 i j; case: (ltrgtP 0%R (row i A 0 0)%R);
-    last move/esym/eqP; move => H2;
+  by case => H H0 H1 i j; case: (ltrgt0P (row i A 0 0))%R;
+    last move/eqP; move => H2;
     rewrite 1?(filter_mxE2 (P := P0) H2)
             1?(filter_mxE2 (P := Ppos) H2)
             1?(filter_mxE2 (P := Pneg) H2);
