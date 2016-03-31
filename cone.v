@@ -58,18 +58,18 @@ Record poly_cone (C : 'cV[rat]_d -> Prop) := Poly_cone (* polyhedral cones *)
   }.
 
 Definition dual_cone (X : 'cV[rat]_d -> Prop) (y : 'cV[rat]_d) :=
-  forall x, X x -> (0 <= (y^T *m x) 0 0)%R.
+  forall x, X x -> posmx (y^T *m x)%R.
 
 Lemma dual_cone_is_cone C : cone (dual_cone C).
 Proof.
 rewrite /dual_cone; constructor => /=.
-- by move => x H; rewrite trmx_const mul0mx mxE.
+- by move => x H; rewrite trmx_const mul0mx posmx0.
 - move => x y Hx Hy z H.
   move: (Hx _ H) (Hy _ H) => {Hx Hy} Hx Hy.
-  by rewrite trmxD mulmxDl mxE; apply addr_ge0.
+  by rewrite trmxD mulmxDl posmx_add.
 - move => a x Ha H y H0.
-  rewrite trmx_scale -scalemxAl mxE.
-  by apply mulr_ge0 => //; apply H.
+  by rewrite trmx_scale -scalemxAl posmx_mx11 mxE;
+    apply mulr_ge0 => //; rewrite -posmx_mx11; apply H.
 Qed.
 
 Lemma dual_cone_inclusion (C1 C2 : 'cV_d -> Prop) :
@@ -79,7 +79,7 @@ Proof. by rewrite /dual_cone => H x H0 y /H /H0. Qed.
 
 Lemma dual_cone_closed C : closed_set (dual_cone C).
 Proof.
-rewrite /closed_set /closure /dual_cone => x H y H0.
+rewrite /closed_set /closure /dual_cone => x H y H0; rewrite posmx_mx11.
 apply/negP => /negP; rewrite -ltrNge => H1.
 set frac : rat := (\sum_(i < d) `|y i 0|)%R.
 have Hfrac: (0 < frac)%R.
@@ -94,7 +94,7 @@ have/H {H} []: (0 < - (x^T *m y) 0 0 / frac)%R
 move => x' /(_ y H0) {H0} H H0.
 have {H0} H0 i: (`|(x - x') i 0| < - (x^T *m y) 0 0 / frac)%R
   by apply: (ler_lt_trans _ H0); rewrite /norm_inf -eqr_maxl maxrC -bigD1_l.
-move: H; apply/negP; rewrite -ltrNge.
+move: H; apply/negP; rewrite posmx_mx11 -ltrNge.
 suff: ((x'^T *m y) 0 0 <
        (x^T *m y) 0 0 + (- (x^T *m y) 0 0 / frac) * frac)%R.
   rewrite mulrAC -mulrA divrr; first by rewrite mulr1 subrr.
@@ -121,19 +121,16 @@ rewrite -{2}(subr0 (y _ _)); case: (lerP 0 (y i 0%R)) => H2.
 - by rewrite sub0r mulrN -mulNr => /(mulIf H3); apply/eqP; rewrite neqr_lt H0.
 Qed.
 
-Lemma dual_coneK C :
-  fg_cone C -> forall x, C x <-> dual_cone (dual_cone C) x.
+Lemma dual_coneK C : poly_cone C -> forall x, C x <-> dual_cone (dual_cone C) x.
 Proof.
-move => [n basis Hfg] x; split;
-  first by move => H y /(_ _ H);
-           rewrite -(trmxK (_ *m _)%R) trmx_mul trmxK mxE.
-move => H; apply Hfg.
-have {H} H (y : 'cV_d): (posmx (basis^T *m y) -> 0 <= (x^T *m y) 0 0)%R.
-  move/posmxP => H0; apply H => x' /Hfg [] c /posmxP H1 -> {x'}.
-  rewrite mulmxA -(trmxK (y^T *m _)%R) trmx_mul trmxK mxE.
-  by apply sumr_ge0 => /= i _; apply mulr_ge0 => //; rewrite mxE.
-admit.
-Abort.
+move => [n normal Hpoly] x; split;
+  first by move => H y /(_ _ H); rewrite mulmx_trl posmx_trmx.
+rewrite /dual_cone; move => H; apply/Hpoly.
+apply/posmxP => i j.
+rewrite mulmx_row_col col_id -posmx_mx11 -posmx_trmx trmx_mul {j}.
+by apply H => x' /Hpoly /posmxP /(_ i 0%R);
+  rewrite trmxK mulmx_row_col col_id -posmx_mx11.
+Qed.
 
 Lemma fg_conic C : fg_cone C -> cone C.
 Proof.
@@ -159,17 +156,15 @@ Qed.
 Lemma duality_direct C : fg_cone C -> poly_cone C.
 Proof.
 case => n basis H.
-set A := (col_mx (row_mx 1%:M (\matrix_(_, _) 0))
-                 (col_mx (row_mx (- basis) 1%:M) (row_mx basis (- 1%:M))))%R.
+set A := (col_mx (row_mx 1%:M 0) (block_mx (- basis) 1%:M basis (- 1%:M)))%R.
 have HC (x : 'cV_d) (c : 'cV_n):
   (posmx (A *m col_mx c x))%R = (posmx c && (x == basis *m c))%R
-  by rewrite /A -(opprK (row_mx basis _)) opp_row_mx opprK !mul_col_mx
+  by rewrite /A /block_mx -(opprK (row_mx basis _)) opp_row_mx opprK !mul_col_mx
              !posmx_col mulNmx eq0mx_posmx !mul_row_col !mul_scalar_mx !scale1r
              (addrC _ x) mulNmx subr_eq0 -{3}(addr0 c);
     congr (posmx (_ + _)%R && _); apply/matrixP => i j; rewrite !mxE /=;
     apply big_rec => // k y _ -> {y}; rewrite !mxE mul0r.
-apply (@Poly_cone C _ (tagged (Fourier_Motzkin_m A))) => x.
-apply (iffP idP).
+apply (@Poly_cone C _ (tagged (Fourier_Motzkin_m A))) => x; apply (iffP idP).
 - by case/Fourier_Motzkin_mP => c;
     rewrite HC => /andP [] H0 /eqP ->; apply H; exists c.
 - by case/H => c H0 ->; apply/Fourier_Motzkin_mP; exists c; rewrite HC H0 eqxx.
@@ -177,29 +172,19 @@ Qed.
 
 Lemma dual_of_poly_cone C : poly_cone C -> fg_cone (dual_cone C).
 Proof.
-case => n normal Hpoly.
-have Hpoly' x: reflect
-            (dual_cone (fun y => exists2 c, posmx c & y = normal^T *m c)%R x)
-            (posmx (normal *m x)%R).
-  apply/(iffP (posmxP _)).
-  - move => H y [c /posmxP H0 ->] {y}; rewrite mulmxA -trmx_mul mxE.
-    by apply/sumr_ge0 => /= i _; apply mulr_ge0; rewrite 1?mxE.
-  - rewrite /dual_cone /= => H i j; move: {H} (H (row i normal)^T%R).
-    rewrite ord1 -trmx_mul -row_mul mxE mxE; apply.
-    exists (delta_mx ord0 i)^T%R.
-    + by apply/posmxP => {j} j k; rewrite !mxE ord1 eqxx; case: eqP.
-    + by rewrite rowE trmx_mul; congr mulmx.
-apply (@Fg_cone _ _ normal^T)%R => y; split.
-- move => H0.
-  admit.
+case => n normal Hpoly; apply (@Fg_cone _ _ normal^T)%R => y; split.
+- by rewrite/dual_cone => H; apply/Farkas => x;
+    rewrite -trmx_mul mulmx_trl !posmx_trmx => /Hpoly; apply H.
 - case => c /posmxP H -> {y} x /Hpoly /posmxP H0.
-  rewrite trmx_mul trmxK -mulmxA mxE.
+  rewrite posmx_mx11 trmx_mul trmxK -mulmxA mxE.
   by apply sumr_ge0 => /= i _; apply mulr_ge0; rewrite // mxE.
-Admitted.
+Qed.
 
 Lemma duality_converse C : poly_cone C -> fg_cone C.
 Proof.
-move/dual_of_poly_cone/duality_direct/dual_of_poly_cone.
-Abort.
+move => H0; move: (dual_coneK H0) => H.
+case/dual_of_poly_cone/duality_direct/dual_of_poly_cone: H0 => n basis H0.
+by apply (@Fg_cone _ _ basis) => x; split => [/H /H0 | /H0 /H].
+Qed.
 
 End ConeDef.

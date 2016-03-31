@@ -113,6 +113,17 @@ Proof.
   by apply (iffP (lermxP 0 mx)) => H i j; move: (H i j); rewrite mxE.
 Qed.
 
+Lemma posmx0 : posmx 0%R.
+Proof. by apply/posmxP => i j; rewrite !mxE. Qed.
+
+Lemma posmx_const x : (0 <= x)%R -> posmx (const_mx x).
+Proof. by move => H; apply/posmxP => i j; rewrite !mxE. Qed.
+
+Lemma posmx_add mx1 mx2 : posmx mx1 -> posmx mx2 -> posmx (mx1 + mx2)%R.
+Proof.
+by move => /posmxP H /posmxP H0; apply/posmxP => i j; rewrite mxE addr_ge0.
+Qed.
+
 End lermx_def.
 
 Notation "A <=m B" := (lermx A B) (at level 70, no associativity) : ring_scope.
@@ -257,6 +268,14 @@ apply/posmxP; case: posmxP.
      move: (H0 0%R (mxvec_index i j)); rewrite mxvecE.
 Qed.
 
+Lemma lermx_mx11 (mx1 mx2 : 'M_1) : (mx1 <=m mx2)%R = (mx1 0 0 <= mx2 0 0)%R.
+Proof.
+by apply/lermxP; case: ifP => [H i j | /negP H0 H]; [rewrite !ord1 | apply: H0].
+Qed.
+
+Lemma posmx_mx11 (mx : 'M_1) : posmx mx = (0 <= mx 0 0)%R.
+Proof. by rewrite /posmx lermx_mx11 mxE. Qed.
+
 End lermx.
 
 Notation "A <=m B" := (lermx A B) (at level 70, no associativity) : ring_scope.
@@ -364,8 +383,6 @@ apply/matrixP => i j;
 by case (ltrgt0P (row i A 0 0)%R) => H /=;
   rewrite ?(col_mxEu, col_mxEd) !mxE enum_rankK_in // inE /P0 H.
 Qed.
-
-Check vec_mx_index.
 
 Definition fm :
   'M[R]_(#|[pred i | P0 (row i A)]| +
@@ -617,9 +634,9 @@ Qed.
 
 Lemma Farkas (R : realFieldType) m n (A : 'M[R]_(m, n)) (b : 'cV_m) :
   (forall y : 'cV_m, posmx (y^T *m A) -> posmx (y^T *m b))%R <->
-  (exists2 x : 'cV_n, posmx x & A *m x = b)%R.
+  (exists2 x : 'cV_n, posmx x & b = A *m x)%R.
 Proof.
-split; last by move => [x H] <- {b} y H0; rewrite mulmxA; apply posmx_mul.
+split; last by move => [x H] -> {b} y H0; rewrite mulmxA; apply posmx_mul.
 move => H.
 suff [x]: exists x : 'cV_n,
   (col_mx (col_mx A (- A)) (- 1%:M) *m x <=m col_mx (col_mx b (-b)) 0)%R
