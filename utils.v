@@ -34,54 +34,6 @@ by move => H1;
   rewrite -(enum_rankK_in (A := A) H H) -(enum_rankK_in (A := A) H0 H0) H1.
 Qed.
 
-Section cons_tuple.
-
-Variable (A : Type) (n : nat).
-
-Definition cons_tuple (h : A) (t : A ^ n) : A ^ n.+1 :=
-  [ffun m => match @split 1 n m with
-               | inl _ => h
-               | inr i => t i
-             end].
-
-Definition tail_tuple (t : A ^ n.+1) : A ^ n := [ffun m => t (rshift 1 m)].
-
-Lemma cons_tuple_eq1 (h : A) (t : A ^ n) : cons_tuple h t 0%R = h.
-Proof. by rewrite /cons_tuple ffunE; case: splitP. Qed.
-
-Lemma cons_tuple_eq2 (h : A) (t : A ^ n) (i : 'I_n) :
-  cons_tuple h t (rshift 1 i) = t i.
-Proof. by rewrite /cons_tuple ffunE split_rshift. Qed.
-
-Lemma tail_tuple_eq (t : A ^ n.+1) (i : 'I_n) : tail_tuple t i = t (rshift 1 i).
-Proof. by rewrite /tail_tuple ffunE. Qed.
-
-Lemma tail_cons_tuple (h : A) (t : A ^ n) : tail_tuple (cons_tuple h t) = t.
-Proof. by apply/ffunP => /= i; rewrite !ffunE split_rshift. Qed.
-
-Lemma cons_tail_tuple (t : A ^ n.+1) : cons_tuple (t 0%R) (tail_tuple t) = t.
-Proof.
-apply/ffunP => /= i; rewrite !ffunE; case: splitP => j Hj.
-- by congr fun_of_fin; apply/val_inj; rewrite /= {}Hj; case: j => -[].
-- by rewrite ffunE; congr fun_of_fin; apply/val_inj.
-Qed.
-
-Lemma cons_tuple_const (x : A) : cons_tuple x [ffun => x] = [ffun => x].
-Proof.
-apply/ffunP => /= i; rewrite /cons_tuple !ffunE.
-by case: splitP => //= i' _; rewrite ffunE.
-Qed.
-
-End cons_tuple.
-
-Lemma cons_tuple_map (A B : Type) (f : A -> B) n (h : A) (t : 'I_n -> A) :
-  [ffun i => f ((cons_tuple h [ffun i => t i]) i)] =
-  cons_tuple (f h) [ffun i => f (t i)].
-Proof.
-apply/ffunP => /= i; rewrite !ffunE.
-by case: splitP => //= i' _; rewrite !ffunE.
-Qed.
-
 Lemma all_allpairsP
       (S T R : eqType) (g : pred R) (f : S -> T -> R) (s : seq S) (t : seq T) :
   reflect (forall (i : S) (j : T), i \in s -> j \in t -> g (f i j))
@@ -320,7 +272,7 @@ Canonical interval_eqType := Eval hnf in EqType interval interval_eqMixin.
 Lemma itv1E (x : R) : x \in itv1.
 Proof. by []. Qed.
 
-Lemma itv0E (x : R) : x \notin itv0.
+Lemma itv0E (x : R) : x \in itv0 = false.
 Proof. by rewrite inE /= ltr_asym. Qed.
 
 Definition itv_lelb (l1 l2 : itv_bound) : bool :=

@@ -2,13 +2,13 @@ Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import all_ssreflect all_algebra.
 Import GRing.Theory Num.Theory.
 
-Set Implicit Arguments.
-Unset Strict Implicit.
-Unset Printing Implicit Defensive.
-
 (******************************************************************************)
 (*  extensions for bigop                                                      *)
 (******************************************************************************)
+
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
 
 Module Semilattice.
 
