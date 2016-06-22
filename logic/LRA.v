@@ -1,7 +1,7 @@
 Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import all_ssreflect all_fingroup all_algebra zmodp.
 Import GroupScope GRing.Theory Num.Theory.
-Require Import utils.
+Require Import utils matrix_ext.
 
 (******************************************************************************)
 (*  Linear rational arithmetic and Fourier-Motzkin variable elimination       *)
@@ -44,7 +44,6 @@ Inductive QFLRA_formula :=
   | QFLRA_neg   of QFLRA_formula
   | QFLRA_and   of QFLRA_formula & QFLRA_formula
   | QFLRA_or    of QFLRA_formula & QFLRA_formula
-  | QFLRA_imply of QFLRA_formula & QFLRA_formula
   | QFLRA_leq   of 'cV[rat]_dim.
 
 Fixpoint eq_QFLRA_formula (f1 f2 : QFLRA_formula) :=
@@ -54,8 +53,6 @@ Fixpoint eq_QFLRA_formula (f1 f2 : QFLRA_formula) :=
       eq_QFLRA_formula f1l f2l && eq_QFLRA_formula f1r f2r
     | QFLRA_or f1l f1r, QFLRA_or f2l f2r =>
       eq_QFLRA_formula f1l f2l && eq_QFLRA_formula f1r f2r
-    | QFLRA_imply f1l f1r, QFLRA_imply f2l f2r =>
-      eq_QFLRA_formula f1l f2l && eq_QFLRA_formula f1r f2r
     | QFLRA_leq t1, QFLRA_leq t2 => t1 == t2
     | _, _ => false
   end.
@@ -64,10 +61,10 @@ Lemma eq_QFLRA_formulaP : Equality.axiom eq_QFLRA_formula.
 Proof.
 move => f1 f2; apply: (iffP idP) => [| <-].
 - by elim: f1 f2 =>
-    [f1' IH | f1l IHl f1r IHr | f1l IHl f1r IHr | f1l IHl f1r IHr | t1]
-    [//= f2' /IH -> | | | | //= t2 /eqP ->]
+    [f1' IH | f1l IHl f1r IHr | f1l IHl f1r IHr | t1]
+    [//= f2' /IH -> | | | //= t2 /eqP ->]
     //= f2l f2r /andP [] /IHl -> /IHr ->.
-- by elim: f1 => //= [f1l -> | f1l -> | f1l ->] *; rewrite ?eqxx.
+- by elim: f1 => //= [f1l -> | f1l ->] *; rewrite ?eqxx.
 Defined.
 
 Canonical QFLRA_formula_eqMixin := EqMixin eq_QFLRA_formulaP.
@@ -86,11 +83,6 @@ Inductive LRA_formula (dim : nat) :=
   | LRA_leq     of LRA_term dim & LRA_term dim.
 
 Definition LRA_literal dim := [eqType of bool * 'cV[rat]_dim].
-(*
-b, (c_1, ..., c_d) =>
-  {(x_1, ..., x_d) | 0 # x_1 c_1 + ... + x_d c_d
-                   | (#) = if b then (<) else (<=) }
-*)
 
 Definition LRA_interpret_af dim (I f : 'cV[rat]_dim) := ((f^T *m I) 0 0)%R.
 
@@ -122,17 +114,11 @@ Fixpoint LRA_af_of_term dim (t : LRA_term dim) (i : 'I_dim) : nat :=
 Lemma LRA_interpret_af_add dim (I f1 f2 : 'cV_dim) :
   (LRA_interpret_af I (f1 + f2) =
    LRA_interpret_af I f1 + LRA_interpret_af I f2)%R.
-Proof.
-by rewrite /LRA_interpret_af !mxE -big_split /=;
-  apply/eq_bigr => i _; rewrite !mxE mulrDl.
-Qed.
+Proof. by rewrite /LRA_interpret_af trmxD mulmxDl mxE. Qed.
 
 Lemma LRA_interpret_af_opp dim (I f : 'cV_dim) :
   (LRA_interpret_af I (- f) = - LRA_interpret_af I f)%R.
-Proof.
-by rewrite /LRA_interpret_af !mxE (big_endo _ (@opprD _)) //;
-  apply/eq_bigr => /= i _; rewrite !mxE mulNr.
-Qed.
+Proof. by rewrite /LRA_interpret_af trmxN mulNmx mxE. Qed.
 
 Lemma LRA_term_val_af dim (I : 'cV_dim) (t : LRA_term dim) :
   LRA_term_val I t = (\sum_(i < dim) I i 0 *+ LRA_af_of_term t i)%R.
@@ -173,8 +159,6 @@ Fixpoint QFLRA_interpret_formula
                            QFLRA_interpret_formula I f2
     | QFLRA_or f1 f2    => QFLRA_interpret_formula I f1 ||
                            QFLRA_interpret_formula I f2
-    | QFLRA_imply f1 f2 => QFLRA_interpret_formula I f1 ==>
-                           QFLRA_interpret_formula I f2
     | QFLRA_leq t       => (0 <= (t^T *m I) 0 0)%R
   end.
 
@@ -202,8 +186,7 @@ Proof.
 rewrite /NF_neg /LRA_interpret_literal -has_predC has_map.
 apply eq_in_has => /= afs _; rewrite -all_predC all_map.
 apply eq_in_all => -[f t] _ /=; rewrite lterN -lter_opp2 oppr0.
-congr lter; rewrite /LRA_interpret_af !mxE big_endo //; last apply opprD.
-by apply eq_bigr => i _; rewrite !mxE mulNr opprK.
+by congr lter; rewrite /LRA_interpret_af trmxN mulNmx mxE opprK.
 Qed.
 
 Lemma NF_neg_DNF dim (I : 'cV_dim) lss :
@@ -213,8 +196,7 @@ Proof.
 rewrite /NF_neg /LRA_interpret_literal -all_predC all_map.
 apply eq_in_all => /= afs _; rewrite -has_predC has_map.
 apply eq_in_has => -[f t] _ /=; rewrite lterN -lter_opp2 oppr0.
-congr lter; rewrite /LRA_interpret_af !mxE big_endo //; last apply opprD.
-by apply eq_bigr => i _; rewrite !mxE mulNr opprK.
+by congr lter; rewrite /LRA_interpret_af trmxN mulNmx mxE opprK.
 Qed.
 
 Fixpoint
@@ -224,7 +206,6 @@ Fixpoint
     | QFLRA_and f1 f2 =>
       [seq fs1 ++ fs2 | fs1 <- QFLRA_DNF f1, fs2 <- QFLRA_DNF f2]
     | QFLRA_or f1 f2 => QFLRA_DNF f1 ++ QFLRA_DNF f2
-    | QFLRA_imply f1 f2 => NF_neg (QFLRA_CNF f1) ++ QFLRA_DNF f2
     | QFLRA_leq f' => [:: [:: (true, f')]]
   end with
   QFLRA_CNF dim (f : QFLRA_formula dim) : seq (seq (LRA_literal dim)) :=
@@ -233,8 +214,6 @@ Fixpoint
     | QFLRA_and f1 f2 => QFLRA_CNF f1 ++ QFLRA_CNF f2
     | QFLRA_or f1 f2 =>
       [seq fs1 ++ fs2 | fs1 <- QFLRA_CNF f1, fs2 <- QFLRA_CNF f2]
-    | QFLRA_imply f1 f2 =>
-      [seq fs1 ++ fs2 | fs1 <- NF_neg (QFLRA_DNF f1), fs2 <- QFLRA_CNF f2]
     | QFLRA_leq f' => [:: [:: (true, f')]]
   end.
 
@@ -244,7 +223,7 @@ Lemma QFLRA_NF_correctness dim (I : 'cV_dim) (f : QFLRA_formula dim) :
   (all (has (LRA_interpret_literal I)) (QFLRA_CNF f) =
      QFLRA_interpret_formula I f).
 Proof.
-move: f; refine (@QFLRA_formula_ind dim _ _ _ _ _ _) => /=.
+move: f; refine (@QFLRA_formula_ind dim _ _ _ _ _) => /=.
 - by move => q [] {3}<- <-; rewrite NF_neg_CNF NF_neg_DNF.
 - move => q1 [] {2}<- <- q2 [] {2}<- <-; split; last by rewrite all_cat.
   elim: (QFLRA_DNF q1) => //= qs qss IH.
@@ -256,24 +235,14 @@ move: f; refine (@QFLRA_formula_ind dim _ _ _ _ _ _) => /=.
   rewrite all_cat {}IH orb_andl; congr andb.
   elim: (QFLRA_CNF q2); rewrite /= ?orbT => // qs' qss' IH.
   by rewrite has_cat {}IH orb_andr.
-- move => q1 [] {3}<- <- q2 [] {2}<- <-;
-  rewrite !implybE has_cat NF_neg_CNF -NF_neg_DNF; split => //.
-  elim: (NF_neg _) => //= qs qss IH.
-  rewrite all_cat {}IH orb_andl; congr andb.
-  elim: (QFLRA_CNF q2); rewrite /= ?orbT => // qs' qss' IH.
-  by rewrite has_cat {}IH orb_andr.
 - by move => f; rewrite !andbT !orbF /=.
 Qed.
 
-Lemma QFLRA_DNF_correctness dim (I : 'cV_dim) (f : QFLRA_formula dim) :
-  has (all (LRA_interpret_literal I)) (QFLRA_DNF f) =
-  QFLRA_interpret_formula I f.
-Proof. by case: (QFLRA_NF_correctness I f). Qed.
+Definition QFLRA_DNF_correctness dim (I : 'cV_dim) (f : QFLRA_formula dim) :=
+  (QFLRA_NF_correctness I f).1.
 
-Lemma QFLRA_CNF_correctness dim (I : 'cV_dim) (f : QFLRA_formula dim) :
-  all (has (LRA_interpret_literal I)) (QFLRA_CNF f) =
-  QFLRA_interpret_formula I f.
-Proof. by case: (QFLRA_NF_correctness I f). Qed.
+Definition QFLRA_CNF_correctness dim (I : 'cV_dim) (f : QFLRA_formula dim) :=
+  (QFLRA_NF_correctness I f).2.
 
 Definition QFLRA_l2f dim (l : LRA_literal dim) :=
   if l.1 then QFLRA_leq l.2 else QFLRA_neg (QFLRA_leq (- l.2)%R).
@@ -283,8 +252,7 @@ Lemma QFLRA_l2f_correctness dim (I : 'cV_dim) (l : LRA_literal dim) :
 Proof.
 rewrite /QFLRA_l2f /LRA_interpret_literal; case: l.1 => //=.
 rewrite -ltrNge -subr_lt0 sub0r; congr (_ < _)%R.
-rewrite /LRA_interpret_af !mxE big_endo //; last apply opprD.
-by apply eq_bigr => i _; rewrite !mxE mulNr.
+by rewrite /LRA_interpret_af trmxN mulNmx (mxE oppmx_key).
 Qed.
 
 Definition QFLRA_unDNF dim (lss : seq (seq (LRA_literal dim))) :=
@@ -350,11 +318,9 @@ have af_decomp (l1 l2 : LRA_literal (1 + dim)) :
     (l1.2 0 0 *: dsubmx l2.2 - l2.2 0 0 *: dsubmx l1.2)%R =
   (l1.2 0 0 * LRA_interpret_af I (dsubmx l2.2) -
    l2.2 0 0 * LRA_interpret_af I (dsubmx l1.2))%R.
-  rewrite /LRA_interpret_af !mxE.
-  rewrite 2?big_endo ?mulr0 //; try by move => a b; rewrite mulrDr.
-  rewrite big_endo //; last apply opprD.
-  rewrite -big_split /=; apply eq_bigr => i _.
-  by rewrite !mulrA -mulNr -mulrDl !mxE.
+  by rewrite /LRA_interpret_af mulmx_trl mulmxBr -!scalemxAr
+             2!mxE (mxE oppmx_key);
+    congr (_ - _)%R; rewrite mulmx_trl !mxE.
 apply (iffP idP); rewrite /exists_conj_elim all_cat.
 - case/andP; rewrite all_map => H /all_allpairsP H0.
   suff: itv_isnot0
@@ -427,7 +393,8 @@ Fixpoint Fourier_Motzkin dim (f : LRA_formula dim) : QFLRA_formula dim :=
     | LRA_neg f' => QFLRA_neg (Fourier_Motzkin f')
     | LRA_and f1 f2 => QFLRA_and (Fourier_Motzkin f1) (Fourier_Motzkin f2)
     | LRA_or f1 f2 => QFLRA_or (Fourier_Motzkin f1) (Fourier_Motzkin f2)
-    | LRA_imply f1 f2 => QFLRA_imply (Fourier_Motzkin f1) (Fourier_Motzkin f2)
+    | LRA_imply f1 f2 =>
+      QFLRA_or (QFLRA_neg (Fourier_Motzkin f1)) (Fourier_Motzkin f2)
     | LRA_leq t1 t2 =>
       QFLRA_leq
         (\col_i ((LRA_af_of_term t2 i)%:Z - (LRA_af_of_term t1 i)%:Z)%:Q)%R
@@ -454,7 +421,8 @@ refine (LRA_formula_rect _ _ _ _ _ _ _) => //= dim.
 - by move => f1 IH1 f2 IH2 I; apply/(iffP andP); case => /IH1 H /IH2 H0.
 - by move => f1 IH1 f2 IH2 I; apply/(iffP orP);
     (case; [move/IH1; left | move/IH2; right]).
-- by move => f1 IH1 f2 IH2 I; apply(iffP implyP) => H /IH1 /H /IH2.
+- by move => f1 IH1 f2 IH2 I;
+    rewrite -implybE; apply(iffP implyP) => H /IH1 /H /IH2.
 - move => l1 l2 I; rewrite !LRA_term_val_af -subr_ge0 !mxE.
   set r1 := (_ - _)%R. set r2 := (\sum_i _)%R.
   suff ->: r1 = r2 by apply idP.

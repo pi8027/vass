@@ -293,3 +293,25 @@ Qed.
 Implicit Arguments bigD1 [I P F].
 
 End SemilatticeProperties.
+
+Section MonoidProperties_ext.
+
+Variable R : Type.
+
+Variable idx : R.
+Notation Local "1" := idx.
+
+Variable op : Monoid.law 1.
+
+Notation "*%M" := op (at level 0).
+Notation "x * y" := (op x y).
+
+Lemma big_allpairs I J K xs ys (f : I -> J -> K) P F :
+  \big[*%M/1]_(k <- allpairs f xs ys | P k) F k =
+  \big[*%M/1]_(i <- xs) \big[*%M/1]_(j <- ys | P (f i j)) F (f i j).
+Proof.
+  elim: xs; first by rewrite !big_nil.
+  by move => x xs IH /=; rewrite big_cat big_cons big_map IH.
+Qed.
+
+End MonoidProperties_ext.
