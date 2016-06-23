@@ -172,14 +172,19 @@ End QFLIA.
 
 (* Quantifier elimination *)
 
-Lemma elimination_principle (a b : int) (d : nat) :
+Lemma modz_dvdm (m n d : int) : (d %| m)%Z -> ((n %% m)%Z = n %[mod d])%Z.
+Proof.
+by move/dvdzP => -[x ->]; rewrite {2}(divz_eq n (x * d)) mulrA modzMDl.
+Qed.
+
+Lemma elimination_principle (a b c : int) (d : nat) :
   reflect
-    (exists x, (a <= x <= b) && (d.+1 %| x)%Z)%R
-    (has (fun i : nat => (a + i <= b) && (d.+1 %| a + i)%Z)%R (iota 0 d.+1)).
+    (exists x, (a <= x <= b) && (d.+1 %| x + c)%Z)%R
+    (has (fun i : nat => (a + i <= b) && (d.+1 %| a + i + c)%Z)%R
+         (iota 0 d.+1)).
 Proof.
 apply/(iffP hasP) => -[x].
-- rewrite mem_iota add0n /= => H H0.
-  by exists (a + x)%R; rewrite ler_addl.
+- by rewrite mem_iota add0n /= => H H0; exists (a + x)%R; rewrite ler_addl.
 - rewrite andbC => /and3P [H H0 H1].
   exists `|(x - a) %% d.+1|%Z;
     last (rewrite gez0_abs ?modz_ge0 //; apply/andP; split).
@@ -187,5 +192,31 @@ apply/(iffP hasP) => -[x].
   + apply: (ler_trans _ H1).
     by rewrite -lter_sub_addl {2}(divz_eq (x - a) d.+1)
                cpr_add mulr_ge0 // divz_ge0 // subr_ge0.
-  + by apply/dvdz_mod0P; rewrite addrC modzDml addrNK; apply/dvdz_mod0P.
+  + by apply/dvdz_mod0P;
+       rewrite addrAC modzDmr addrAC (addrC a) addrNK; apply/dvdz_mod0P.
+Qed.
+
+Lemma elimination_principle' (a b : int) (ds : seq (nat * int)) :
+  reflect
+    (exists x, (a <= x <= b) && all (fun d => d.1.+1 %| x + d.2)%Z ds)%R
+    (has (fun i : nat => (a + i <= b) &&
+                         all (fun d => d.1.+1 %| a + i + d.2)%Z ds)
+         (iota 0 (\prod_(d <- ds) d.1.+1)))%R.
+Proof.
+apply/(iffP hasP) => -[x].
+- by rewrite mem_iota add0n /= => H H0; exists (a + x)%R; rewrite ler_addl.
+- rewrite andbC => /and3P /= [H H0 H1].
+  have H2: 0 < \prod_(d <- ds) d.1.+1 by apply prodn_cond_gt0.
+  exists `|(x - a) %% (\prod_(d <- ds) d.1.+1)%N|%Z;
+    last (rewrite gez0_abs ?modz_ge0 ?lt0n_neq0 //; apply/andP; split).
+  + by rewrite mem_iota add0n /=
+               -ltz_nat gez0_abs ?modz_ge0 ?lt0n_neq0 // ltz_pmod.
+  + apply: (ler_trans _ H1).
+    by rewrite -lter_sub_addl {2}(divz_eq (x - a) (\prod_(d <- ds) d.1.+1)%N)
+               cpr_add mulr_ge0 // divz_ge0 // subr_ge0.
+  + apply/allP => -[/= d c] Hd.
+    apply/dvdz_mod0P; rewrite addrAC -modzDmr modz_dvdm.
+    * rewrite modzDmr addrAC (addrC a) addrNK.
+      by apply/dvdz_mod0P/(allP H (d, c) Hd).
+    * by rewrite unfold_in /= (big_rem _ Hd) /=; apply dvdn_mulr, dvdnn.
 Qed.
