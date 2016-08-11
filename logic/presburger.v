@@ -323,29 +323,25 @@ by rewrite muln_gt0; apply/andP; split;
   apply/prodn_cond_gt0 => i H; rewrite absz_gt0.
 Qed.
 
-Lemma prod_coef_cml :
-  all (fun f : int * 'cV[int]_(1 + dim) =>
-         (f.2 0 0 == 0)%R || (f.2 0%R 0%R %| prod_coef%:Z))%Z fs_leq.
+Lemma prod_coef_cml f :
+  f \in fs_leq -> (f.2 0 0 == 0)%R || (f.2 0%R 0%R %| prod_coef%:Z)%Z.
 Proof.
-apply/allP => -[/= n t] H.
-rewrite -(negbK (_ == _)) -implybE /prod_coef.
+rewrite -(negbK (_ == _)) -implybE /prod_coef => H.
 apply/implyP => H0.
 rewrite (big_rem _ H) /= H0 !PoszM -mulrA; apply dvdz_mulr.
 by rewrite dvdzE absz_id dvdnn.
 Qed.
 
-Lemma prod_coef_cmm :
-  all (fun f : nat * int * 'cV[int]_(1 + dim) =>
-         (f.2 0 0 == 0)%R || (f.2 0%R 0%R %| prod_coef%:Z))%Z fs_mod.
+Lemma prod_coef_cmm f :
+  f \in fs_mod -> (f.2 0 0 == 0)%R || (f.2 0%R 0%R %| prod_coef%:Z)%Z.
 Proof.
-apply/allP => -[/= n t] H.
-rewrite -(negbK (_ == _)) -implybE /prod_coef.
+rewrite -(negbK (_ == _)) -implybE /prod_coef => H.
 apply/implyP => H0.
 rewrite (big_rem _ H) /= H0 !PoszM mulrCA; apply dvdz_mulr.
 by rewrite dvdzE absz_id dvdnn.
 Qed.
 
-Lemma prod_mod_divisor f : f \in fs_mod1 -> (f.1.1.+1 %| prod_mod%:Z)%Z.
+Lemma prod_mod_cm f : f \in fs_mod1 -> (f.1.1.+1 %| prod_mod%:Z)%Z.
 Proof.
 move => Hf.
 rewrite /prod_mod (eq_big_perm _ (perm_to_rem Hf)) /= big_cons PoszM mulrC.
@@ -366,7 +362,7 @@ apply eq_in_all => -[/= n t] Hf.
 rewrite -(vsubmxK t) tr_col_mx (mxE col_mx_key);
   case: splitP => // j _;
   rewrite ord1 {j} vsubmxK mul_row_col 2!mxE big_ord1 3!mxE lshift0.
-by (case: (ltrgtP (t 0 0) 0)%R (allP prod_coef_cml _ Hf);
+by (case: (ltrgtP (t 0 0) 0)%R (prod_coef_cml Hf);
       last by move => -> _ /=; rewrite mul0r add0r andbT);
   rewrite dvdz_eq => /= H /eqP H0;
   rewrite ?andbT trmx_scale -scalemxAl (mxE scalemx_key) -mulrDr
@@ -392,7 +388,7 @@ apply eq_in_all => /= -[[d n] t] Hf /=.
 rewrite -{1}(vsubmxK t) tr_col_mx mul_row_col 2!mxE big_ord1 3!mxE lshift0.
 case_eq (t 0%R 0%R == 0%R) => H; rewrite H /=;
   first by rewrite andbT (eqP H) mul0r add0r.
-move: (allP prod_coef_cmm _ Hf) prod_coef_gt0.
+move: (prod_coef_cmm Hf) prod_coef_gt0.
 rewrite H /= => /dvdzP [prod_coef' H0] /lt0n_neq0.
 rewrite -eqz_nat H0 mulzK ?H // mulf_eq0 H /= orbF => H1.
 by rewrite prednK ?ltz_nat ?muln_gt0 /= ?absz_gt0 //
@@ -423,7 +419,7 @@ have H_prodm : (0 < prod_mod%:Z)%R by rewrite ltz_nat prodn_gt0.
 have H_periodm x : P x = P (prod_mod%:Z + x)%R
   by apply eq_in_all => /= f Hf; rewrite !dvdzE'; congr eq_op; apply/esym/eqP;
      rewrite eqz_mod_dvd addrCA -2!(addrA prod_mod%:Z%Z) subrr addr0;
-     apply prod_mod_divisor.
+     apply prod_mod_cm.
 move: (periodic_qe_principle int_archi (bs true) (bs false) H_prodm H_periodm).
 set F1 := exists x : int, _.
 set F2 := exists x : int, _.
@@ -478,7 +474,7 @@ apply (iffP andP) => -[H0 H]; (split; first apply H0);
     rewrite addr0 !dvdzE'; congr eq_op; apply/eqP.
     rewrite eqz_mod_dvd !(addrC f.1.2) -!(addrA _ f.1.2)
             opprD addrA (addrAC x) -addrA subrr addr0 -eqz_mod_dvd modz_dvdm //.
-    by apply prod_mod_divisor.
+    by apply prod_mod_cm.
 - move => H; rewrite QFLIA_conj_all; apply/all_allpairsP => /= i j Hi Hj.
   case: {H} (H _ _ (map_f _ Hj) (map_f _ Hi)) => x /and3P [/= H H0 H1].
   rewrite QFLIA_disj_has has_map; apply/hasP.
@@ -498,7 +494,7 @@ apply (iffP andP) => -[H0 H]; (split; first apply H0);
     rewrite addrAC trmxD mulmxDl (mxE addmx_key) addrA (addrAC f.1.2 (_ + _)%R)
             -(addrA (f.1.2 + _)%R) eqz_modDl eqz_mod_dvd
             (addrAC j.1) opprD addrA -eqz_mod_dvd modz_dvdm //.
-    by apply prod_mod_divisor.
+    by apply prod_mod_cm.
 Qed.
 
 End QE.
