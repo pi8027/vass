@@ -1,7 +1,6 @@
-Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import all_ssreflect all_fingroup all_algebra zmodp.
 Import GroupScope GRing.Theory Num.Theory.
-Require Import utils matrix_ext.
+Require Import utils algebra_ext matrix_ext.
 
 (******************************************************************************)
 (*  Linear rational arithmetic and Fourier-Motzkin variable elimination       *)
@@ -166,7 +165,7 @@ Definition QFLRA_top dim : QFLRA_formula dim := QFLRA_leq 0%R.
 Arguments QFLRA_top {dim}.
 
 Lemma QFLRA_top_true dim (I : 'cV_dim) : QFLRA_interpret_formula I QFLRA_top.
-Proof. by rewrite /= mxE; apply sumr_ge0 => i _; rewrite !mxE mul0r. Qed.
+Proof. by rewrite /= trmx0 mul0mx mxE. Qed.
 
 Definition QFLRA_bot dim : QFLRA_formula dim := QFLRA_neg QFLRA_top.
 Arguments QFLRA_bot {dim}.
@@ -331,7 +330,7 @@ apply (iffP idP); rewrite /exists_conj_elim all_cat.
     (l.2 0 0 == 0)%R -> l \in ls -> literal_interval I l = itv1
     by move => H1 H2; rewrite /literal_interval H1;
        move: (allP H l); rewrite mem_filter H1 H2 /= => /(_ isT) ->.
-  rewrite itv_intersection_isnot0E;
+  rewrite itv_bigI_pairwise0;
     apply/allP => /= itv /allpairsP [] [] /= l1 l2 [H2 H3 H4]; subst itv.
   case_eq (l1.2 0 0 == 0)%R => H4;
     first rewrite (H1 l1) // itv_intersection1i {H4};

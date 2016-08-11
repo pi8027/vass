@@ -1,7 +1,6 @@
-Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import all_ssreflect all_fingroup all_algebra zmodp.
 Import GroupScope GRing.Theory Num.Theory.
-Require Import utils.
+Require Import utils algebra_ext.
 
 (******************************************************************************)
 (*  extensions for matrix                                                     *)
@@ -445,7 +444,7 @@ apply/(iffP andP).
               | inl i => `[b (row i subApos), +oo[
               | inr j => `]-oo, b (row j subAneg)]
             end)%R
-    by rewrite /= itv_intersection_isnot0E;
+    by rewrite /= itv_bigI_pairwise0;
       apply/all_allpairsP => -[] /= i [] j _ _ //=; first (by case: ifP);
       rewrite !mulNr ler_opp2 !(mxE matrix_key _ 0%R);
       [move: (H0 (i, j)) | move: (H0 (j, i))];
@@ -609,7 +608,8 @@ elim: n m {A b} (row_mx A b) H => //= [| n IHn] m A H.
       by apply/matrixP => i j; rewrite mxE Fourier_Motzkin.subA0_0 mxE.
     by rewrite mulmx0 mxE add0r mulmx_row_col row_id -trmx_mul mulmx_trl
                mulmxA mulmxN 2!mxE addrC mulmx_row_col row_id subrr.
-  + rewrite (mxE rsubmx_key) !(mxE addmx_key) !(mulmx_row_col (lsubmx y)) -addrA;
+  + rewrite (mxE rsubmx_key) !(mxE addmx_key)
+            !(mulmx_row_col (lsubmx y)) -addrA;
       congr ((_ *m _) _ _ + _)%R; first by apply/matrixP => k l; rewrite !mxE.
     rewrite !(mulmx_row_col _ _ i (rshift 1 j)) !row_id -trmx_mul mulmx_trl
             mxE mulmxA mulmxN addrC -(trmxK (col _ subAneg))

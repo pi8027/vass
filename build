@@ -1,7 +1,7 @@
 #!/bin/zsh
 
 export GREP_COLORS='ms=101:mc=01;31:sl=:cx=:fn=35:ln=32:bn=32:se=36'
-vfiles=(utils.v bigop_ext.v matrix_ext.v logic/presburger.v logic/LRA.v cone.v VASs.v)
+vfiles=(utils.v bigop_ext.v algebra_ext.v matrix_ext.v logic/presburger.v logic/LRA.v cone.v VASs.v)
 error=
 
 puterr(){

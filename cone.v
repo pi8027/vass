@@ -1,4 +1,3 @@
-Require Import mathcomp.ssreflect.ssreflect.
 From mathcomp Require Import all_ssreflect all_fingroup all_algebra zmodp.
 Import GroupScope GRing.Theory Num.Theory.
 Require Import utils bigop_ext matrix_ext.
