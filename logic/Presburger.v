@@ -3,33 +3,12 @@ Require Import utils algebra_ext bigop_ext matrix_ext.
 Import GroupScope GRing.Theory Num.Theory.
 
 (******************************************************************************)
-(*  Semilinear set and Presburger arithmetic                                  *)
+(*  Presburger arithmetic                                                     *)
 (******************************************************************************)
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
-
-(* Presburger formula and its interpretation *)
-
-Inductive LIA_formula (dim : nat) :=
-  | f_all     of LIA_formula (1 + dim)
-  | f_exists  of LIA_formula (1 + dim)
-  | f_neg     of LIA_formula dim
-  | f_and     of LIA_formula dim & LIA_formula dim
-  | f_or      of LIA_formula dim & LIA_formula dim
-  | f_leq     of 'cV[int]_dim & int.
-
-Fixpoint interpret_formula dim (f : LIA_formula dim) : 'cV[int]_dim -> Prop :=
-  match f with
-    | f_all f => fun I => forall n, interpret_formula f (col_mx (const_mx n) I)
-    | f_exists f =>
-      fun I => exists n, interpret_formula f (col_mx (const_mx n) I)
-    | f_neg f => fun I => ~ interpret_formula f I
-    | f_and f f' => fun I => interpret_formula f I /\ interpret_formula f' I
-    | f_or f f' => fun I => interpret_formula f I \/ interpret_formula f' I
-    | f_leq t n => fun I => (0 <= n + (t^T *m I) 0 0)%R
-  end.
 
 (* Quantifier free Presburger formula and negation free normal forms *)
 
@@ -157,7 +136,10 @@ Fixpoint QFLIA_NF (f : QFLIA_formula) b1 b2 : seq (seq QFLIA_af) :=
       else [:: [:: f']]
   end.
 
-Lemma QFLIA_NF_correctness' I (f : QFLIA_formula) b1 b2 :
+Definition QFLIA_DNF f := QFLIA_NF f false false.
+Definition QFLIA_CNF f := QFLIA_NF f true false.
+
+Lemma QFLIA_NF_correctness' b1 b2 I (f : QFLIA_formula) :
   QFLIA_interpret_formula I f =
   \big[(if b1 then andb else orb)/b1]_(fs <- QFLIA_NF f b1 b2)
     \big[(if b1 then orb else andb)/ ~~ b1]_(af <- fs)
@@ -200,20 +182,44 @@ elim: f b1 b2 => //=.
     by rewrite -addrA modzDl addrC {1}(divz_eq x m.+1) -addrA modzMDl subrr.
 Qed.
 
-Lemma QFLIA_NF_correctness I (f : QFLIA_formula) b1 :
+Lemma QFLIA_NF_correctness b1 I (f : QFLIA_formula) :
   QFLIA_interpret_formula I f =
-  \big[(if b1 then andb else orb)/b1]_(fs <- QFLIA_NF f b1 false)
-    \big[(if b1 then orb else andb)/ ~~ b1]_(af <- fs)
-      (QFLIA_interpret_af I af).
+  (if b1 then all else has)
+    ((if b1 then has else all) (QFLIA_interpret_af I))
+    (QFLIA_NF f b1 false).
 Proof.
-rewrite (QFLIA_NF_correctness' I f b1 false).
-by apply eq_bigr => i _; apply eq_bigr => j _; rewrite addFb.
+rewrite (QFLIA_NF_correctness'  b1 false I f).
+elim: (QFLIA_NF _ _ _); first by rewrite big_nil; case: b1 => //.
+by case: b1 => fs fss IH; rewrite /= big_cons IH; [congr andb | congr orb];
+  (elim: fs; first by rewrite big_nil) => af fs IH';
+  rewrite big_cons /=; [congr orb | congr andb].
 Qed.
 
 End QFLIA.
 
 Arguments QFLIA_top {dim}.
 Arguments QFLIA_bot {dim}.
+
+(* Presburger formula and its interpretation *)
+
+Inductive LIA_formula (dim : nat) :=
+  | f_all    of LIA_formula (1 + dim)
+  | f_exists of LIA_formula (1 + dim)
+  | f_neg    of LIA_formula dim
+  | f_and    of LIA_formula dim & LIA_formula dim
+  | f_or     of LIA_formula dim & LIA_formula dim
+  | f_leq    of int & 'cV[int]_dim.
+
+Fixpoint interpret_formula dim (f : LIA_formula dim) : 'cV[int]_dim -> Prop :=
+  match f with
+    | f_all f => fun I => forall n, interpret_formula f (col_mx (const_mx n) I)
+    | f_exists f =>
+      fun I => exists n, interpret_formula f (col_mx (const_mx n) I)
+    | f_neg f => fun I => ~ interpret_formula f I
+    | f_and f f' => fun I => interpret_formula f I /\ interpret_formula f' I
+    | f_or f f' => fun I => interpret_formula f I \/ interpret_formula f' I
+    | f_leq n t => fun I => (0 <= n + (t^T *m I) 0 0)%R
+  end.
 
 (* Quantifier elimination *)
 
@@ -231,36 +237,7 @@ Qed.
 Lemma dvdzE' (d m : int) : (d %| m)%Z = (m %% d == 0)%Z.
 Proof. by case: dvdz_mod0P => /eqP // H; apply/eqP. Qed.
 
-(*
-Lemma elimination_principle1 (a b : int) (ds : seq (nat * int * int)) :
-  reflect
-    (exists x, (a <= x <= b) &&
-               all (fun d => d.1.1.+1 %| d.1.2 * x + d.2)%Z ds)%R
-    (@has nat
-          (fun i => (a + i <= b) &&
-                    all (fun d => d.1.1.+1 %| d.1.2 * (a + i) + d.2)%Z ds)
-          (iota 0 (\prod_(d <- ds) d.1.1.+1)))%R.
-Proof.
-apply/(iffP hasP) => -[x].
-- by rewrite mem_iota add0n /= => H H0; exists (a + x)%R; rewrite ler_addl.
-- rewrite andbC => /and3P /= [H H0 H1].
-  have H2: 0 < \prod_(d <- ds) d.1.1.+1 by apply prodn_gt0.
-  exists `|(x - a) %% (\prod_(d <- ds) d.1.1.+1)%N|%Z;
-    last (rewrite gez0_abs ?modz_ge0 ?lt0n_neq0 //; apply/andP; split).
-  + by rewrite mem_iota add0n /=
-               -ltz_nat gez0_abs ?modz_ge0 ?lt0n_neq0 // ltz_pmod.
-  + apply: (ler_trans _ H1).
-    by rewrite -lter_sub_addl {2}(divz_eq (x - a) (\prod_(d <- ds) d.1.1.+1)%N)
-               cpr_add mulr_ge0 // divz_ge0 // subr_ge0.
-  + apply/allP => -[[/= m c1] c2] Hd.
-    apply/dvdz_mod0P; rewrite -modzDml -modzMmr -(modzDmr a) modz_dvdm.
-    * rewrite  modzDmr modzMmr modzDml addrCA subrr addr0.
-      by apply/dvdz_mod0P/(allP H _ Hd).
-    * by rewrite unfold_in /= (big_rem _ Hd) /=; apply dvdn_mulr, dvdnn.
-Qed.
-*)
-
-Section QE.
+Section QE_principle.
 
 Variables (dim : nat)
           (fs_leq : seq (int * 'cV[int]_(1 + dim)))
@@ -301,7 +278,7 @@ Definition exists_conj_elim_mod (x0 : int) (t : 'cV_dim) : QFLIA_formula dim :=
          (QFLIA_divisible fm.1.1 (fm.1.2 + x0) (fm.2 + t))
     | fm <- fs_mod1].
 
-Definition exists_conj_elim : QFLIA_formula dim :=
+Definition exists_conj_elim' : QFLIA_formula dim :=
   QFLIA_and
   (QFLIA_conj
      ([seq QFLIA_aformula (QFLIA_leq f.1 f.2) | f <- fs_leq0] ++
@@ -410,7 +387,7 @@ Lemma exists_conj_elimP I :
         all (QFLIA_interpret_af (col_mx (const_mx x) I))
             ([seq QFLIA_leq f.1 f.2 | f <- fs_leq] ++
              [seq QFLIA_divisible f.1.1 f.1.2 f.2 | f <- fs_mod]))
-    (QFLIA_interpret_formula I exists_conj_elim).
+    (QFLIA_interpret_formula I exists_conj_elim').
 Proof.
 set bs := fun fl => [seq (true, f.1 + (f.2^T *m I) 0 0)%R | f <- fs_leq1 fl].
 set P := fun x => all
@@ -445,7 +422,7 @@ have: F1 <->
 move => H H0.
 move: {H H0} (iff_trans H (and_iff_compat_l _ H0)) => H1.
 apply: (equivP _ (iff_sym H1)) => {H1}; subst F1 F2.
-rewrite /exists_conj_elim /= QFLIA_conj_all !all_cat !all_map.
+rewrite /exists_conj_elim' /= QFLIA_conj_all !all_cat !all_map.
 Opaque fs_leq0 fs_leq1 fs_mod0 fs_mod1.
 apply (iffP andP) => -[H0 H]; (split; first apply H0);
   move: {H0} H; rewrite /bs /nilp !size_map -!/(nilp _) orbC;
@@ -495,6 +472,81 @@ apply (iffP andP) => -[H0 H]; (split; first apply H0);
             -(addrA (f.1.2 + _)%R) eqz_modDl eqz_mod_dvd
             (addrAC j.1) opprD addrA -eqz_mod_dvd modz_dvdm //.
     by apply prod_mod_cm.
+Transparent fs_leq0 fs_leq1 fs_mod0 fs_mod1.
 Qed.
 
-End QE.
+End QE_principle.
+
+Definition exists_conj_elim dim (ls : seq (QFLIA_af dim.+1)) :
+  QFLIA_formula dim :=
+  exists_conj_elim'
+    (pmap (fun l => match l with
+                    | QFLIA_leq n t => Some (n, t)
+                    | _ => None end) ls)
+    (pmap (fun l => match l with
+                    | QFLIA_divisible m n t => Some (m, n, t)
+                    | _ => None end) ls).
+
+Definition exists_DNF_elim dim (lss : seq (seq (QFLIA_af dim.+1))) :
+  QFLIA_formula dim :=
+  QFLIA_disj [seq exists_conj_elim ls | ls <- lss].
+
+Lemma exists_DNF_elimP dim I (lss : seq (seq (QFLIA_af (1 + dim)))) :
+  reflect (exists x,
+             has (all (QFLIA_interpret_af (col_mx (const_mx x) I))) lss)
+          (QFLIA_interpret_formula I (exists_DNF_elim lss)).
+Proof.
+rewrite /exists_DNF_elim QFLIA_disj_has.
+apply (iffP hasP).
+- case => /= ls' /mapP [] /= ls H -> {ls'} /exists_conj_elimP [] x.
+  rewrite all_cat !all_map !all_pmap -all_predI => H0.
+  exists x; apply/hasP => /=; exists ls => //.
+  by apply/allP => l /(allP H0) => /=; case: l => //= n t; rewrite andbT.
+- case => x /hasP [] /= ls H H0.
+  exists (exists_conj_elim ls).
+  + by apply map_f.
+  + apply/exists_conj_elimP; exists x.
+    by rewrite all_cat !all_map !all_pmap -all_predI; apply/allP => l /(allP H0);
+      case: l => //= n t; rewrite andbT.
+Qed.
+
+Fixpoint Presburger_algorithm dim (f : LIA_formula dim) : QFLIA_formula dim :=
+  match f with
+    | f_all f' =>
+      QFLIA_neg
+        (exists_DNF_elim (QFLIA_DNF (QFLIA_neg (Presburger_algorithm f'))))
+    | f_exists f' =>
+      exists_DNF_elim (QFLIA_DNF (Presburger_algorithm f'))
+    | f_neg f' => QFLIA_neg (Presburger_algorithm f')
+    | f_and f1 f2 =>
+      QFLIA_and (Presburger_algorithm f1) (Presburger_algorithm f2)
+    | f_or f1 f2 =>
+      QFLIA_or (Presburger_algorithm f1) (Presburger_algorithm f2)
+    | f_leq n t =>
+      QFLIA_aformula (QFLIA_leq n t)
+  end.
+
+Lemma Presburger_algorithmP dim I (f : LIA_formula dim) :
+  reflect (interpret_formula f I)
+          (QFLIA_interpret_formula I (Presburger_algorithm f)).
+Proof.
+move: dim f I.
+refine (LIA_formula_rect _ _ _ _ _ _) => //= dim.
+- move => f IH I; apply/(iffP idP).
+  + move/exists_DNF_elimP => H x; apply/IH/negP => /negP.
+    by move: (QFLIA_NF_correctness false (col_mx (const_mx x) I)
+                                   (QFLIA_neg (Presburger_algorithm f)))
+      => /= -> H0; apply H; exists x.
+  + move => H; apply/negP => /exists_DNF_elimP [x].
+    by move: (QFLIA_NF_correctness false (col_mx (const_mx x) I)
+                                   (QFLIA_neg (Presburger_algorithm f)))
+      => /= <-; move/negP; apply; apply/IH/H.
+- by move => f IH I; apply (iffP (exists_DNF_elimP _ _));
+     move => [x H]; exists x; move: H;
+     rewrite /QFLIA_DNF -(QFLIA_NF_correctness false) => /IH.
+- by move => f IH I; apply/(iffP idP); move/IH.
+- by move => f1 IH1 f2 IH2 I; apply/(iffP andP); case => /IH1 H /IH2 H0.
+- by move => f1 IH1 f2 IH2 I; apply/(iffP orP);
+    (case; [move/IH1; left | move/IH2; right]).
+- by move => n t I; apply idP.
+Qed.
