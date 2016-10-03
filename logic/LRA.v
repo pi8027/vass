@@ -10,6 +10,10 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
+Section LRA.
+
+Variable (R : realFieldType).
+
 Section QFLRA.
 
 Variable (dim : nat).
@@ -18,7 +22,7 @@ Inductive QFLRA_formula :=
   | QFLRA_neg   of QFLRA_formula
   | QFLRA_and   of QFLRA_formula & QFLRA_formula
   | QFLRA_or    of QFLRA_formula & QFLRA_formula
-  | QFLRA_leq   of 'cV[rat]_dim.
+  | QFLRA_leq   of 'cV[R]_dim.
 
 Fixpoint eq_QFLRA_formula (f1 f2 : QFLRA_formula) :=
   match f1, f2 with
@@ -54,11 +58,11 @@ Inductive LRA_formula (dim : nat) :=
   | LRA_and     of LRA_formula dim & LRA_formula dim
   | LRA_or      of LRA_formula dim & LRA_formula dim
   | LRA_imply   of LRA_formula dim & LRA_formula dim
-  | LRA_leq     of 'cV[int]_dim.
+  | LRA_leq     of 'cV[R]_dim.
 
-Definition LRA_literal dim := [eqType of bool * 'cV[rat]_dim].
+Definition LRA_literal dim := [eqType of bool * 'cV[R]_dim].
 
-Definition LRA_interpret_af dim (I f : 'cV[rat]_dim) := ((f^T *m I) 0 0)%R.
+Definition LRA_interpret_af dim (I f : 'cV[R]_dim) := ((f^T *m I) 0 0)%R.
 
 Definition LRA_interpret_literal dim (I : 'cV_dim) (f : LRA_literal dim) :=
   lter f.1 0%R (LRA_interpret_af I f.2).
@@ -80,7 +84,7 @@ Lemma LRA_interpret_af_opp dim (I f : 'cV_dim) :
   (LRA_interpret_af I (- f) = - LRA_interpret_af I f)%R.
 Proof. by rewrite /LRA_interpret_af trmxN mulNmx mxE. Qed.
 
-Fixpoint LRA_interpret_formula' dim (f : LRA_formula dim) : 'cV[rat]_dim -> Prop :=
+Fixpoint LRA_interpret_formula' dim (f : LRA_formula dim) : 'cV[R]_dim -> Prop :=
   match f with
   | LRA_forall f' => fun I =>
     forall x, LRA_interpret_formula' f' (col_mx (const_mx x) I)
@@ -93,7 +97,7 @@ Fixpoint LRA_interpret_formula' dim (f : LRA_formula dim) : 'cV[rat]_dim -> Prop
     LRA_interpret_formula' f1 I \/ LRA_interpret_formula' f2 I
   | LRA_imply f1 f2 => fun I =>
     LRA_interpret_formula' f1 I -> LRA_interpret_formula' f2 I
-  | LRA_leq t => fun I => (0 <= \sum_i I i 0 *~ t i 0)%R
+  | LRA_leq t => fun I => (0 <= \sum_i t i 0 * I i 0)%R
   end.
 
 Notation LRA_interpret_formula I f := (@LRA_interpret_formula' _ f I).
@@ -342,7 +346,7 @@ Fixpoint Fourier_Motzkin dim (f : LRA_formula dim) : QFLRA_formula dim :=
     | LRA_or f1 f2 => QFLRA_or (Fourier_Motzkin f1) (Fourier_Motzkin f2)
     | LRA_imply f1 f2 =>
       QFLRA_or (QFLRA_neg (Fourier_Motzkin f1)) (Fourier_Motzkin f2)
-    | LRA_leq t => QFLRA_leq (\col_i (t i 0)%:~R)%R
+    | LRA_leq t => QFLRA_leq (\col_i (t i 0))%R
   end.
 
 Lemma Fourier_MotzkinP dim I (f : LRA_formula dim) :
@@ -369,5 +373,7 @@ refine (LRA_formula_rect _ _ _ _ _ _ _) => //= dim.
 - move => t I; rewrite mxE.
   set r1 := (\sum_i _)%R; set r2 := (\sum_i _)%R.
   suff ->: r1 = r2 by apply idP.
-  by subst r1 r2; apply/eq_bigr => /= i _; rewrite !mxE mulrzl.
+  by subst r1 r2; apply/eq_bigr => /= i _; rewrite !mxE.
 Qed.
+
+End LRA.

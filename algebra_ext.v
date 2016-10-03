@@ -39,17 +39,15 @@ case: b1; case: b2 => /=.
 apply ler_trans. apply ler_lt_trans. apply ltr_le_trans. apply ltr_trans.
 Qed.
 
-Lemma lter_andb b1 b2 r1 r2 :
-  lter (b1 && b2) r1 r2 = lter b1 r1 r2 && lter b2 r1 r2.
+Lemma lter_andb x y : {morph (fun p => lter p x y) : p q / p && q}.
 Proof.
-by case: b1; case: b2 => /=; rewrite ?ler_eqVlt;
+by case => [] [] /=; rewrite ?ler_eqVlt;
   case: (_ < _)%R; rewrite ?(orbT, orbF, andbF, andbb).
 Qed.
 
-Lemma lter_orb b1 b2 r1 r2 :
-  lter (b1 || b2) r1 r2 = lter b1 r1 r2 || lter b2 r1 r2.
+Lemma lter_orb x y : {morph (fun p => lter p x y) : p q / p || q}.
 Proof.
-by case: b1; case: b2 => /=; rewrite ?ler_eqVlt;
+by case => [] [] /=; rewrite ?ler_eqVlt;
   case: (_ < _)%R; rewrite ?(orbT, orbF, orbb).
 Qed.
 
