@@ -1,0 +1,6 @@
+This repository contains following formalizations:
+* logic/LRA.v: Linear real arithmetic and Fourier-Motzkin elimination
+* logic/Presburger.v: Presburger arithmetic and quantifier elimination
+* algebra\_ext.v: Quantifier elimination principle for linear inequalities
+* matrix\_ext.v: Farkas' lemma
+* cone.v: Elementary theory of convex cones.
