@@ -78,13 +78,14 @@ Qed.
 Lemma LRA_interpret_af_add dim (I f1 f2 : 'cV_dim) :
   (LRA_interpret_af I (f1 + f2) =
    LRA_interpret_af I f1 + LRA_interpret_af I f2)%R.
-Proof. by rewrite /LRA_interpret_af trmxD mulmxDl mxE. Qed.
+Proof. by rewrite /LRA_interpret_af linearD mulmxDl mxE. Qed.
 
 Lemma LRA_interpret_af_opp dim (I f : 'cV_dim) :
   (LRA_interpret_af I (- f) = - LRA_interpret_af I f)%R.
-Proof. by rewrite /LRA_interpret_af trmxN mulNmx mxE. Qed.
+Proof. by rewrite /LRA_interpret_af linearN mulNmx mxE. Qed.
 
-Fixpoint LRA_interpret_formula' dim (f : LRA_formula dim) : 'cV[R]_dim -> Prop :=
+Fixpoint LRA_interpret_formula'
+  dim (f : LRA_formula dim) : 'cV[R]_dim -> Prop :=
   match f with
   | LRA_forall f' => fun I =>
     forall x, LRA_interpret_formula' f' (col_mx (const_mx x) I)
@@ -137,7 +138,7 @@ Proof.
 rewrite /NF_neg /LRA_interpret_literal -has_predC has_map.
 apply eq_in_has => /= afs _; rewrite -all_predC all_map.
 apply eq_in_all => -[f t] _ /=; rewrite lterN -lter_opp2 oppr0.
-by congr lter; rewrite /LRA_interpret_af trmxN mulNmx mxE opprK.
+by congr lter; rewrite /LRA_interpret_af linearN mulNmx mxE opprK.
 Qed.
 
 Lemma NF_neg_DNF dim (I : 'cV_dim) lss :
@@ -147,7 +148,7 @@ Proof.
 rewrite /NF_neg /LRA_interpret_literal -all_predC all_map.
 apply eq_in_all => /= afs _; rewrite -has_predC has_map.
 apply eq_in_has => -[f t] _ /=; rewrite lterN -lter_opp2 oppr0.
-by congr lter; rewrite /LRA_interpret_af trmxN mulNmx mxE opprK.
+by congr lter; rewrite /LRA_interpret_af linearN mulNmx mxE opprK.
 Qed.
 
 Fixpoint
@@ -203,7 +204,7 @@ Lemma QFLRA_l2f_correctness dim (I : 'cV_dim) (l : LRA_literal dim) :
 Proof.
 rewrite /QFLRA_l2f /LRA_interpret_literal; case: l.1 => //=.
 rewrite -ltrNge -subr_lt0 sub0r; congr (_ < _)%R.
-by rewrite /LRA_interpret_af trmxN mulNmx (mxE oppmx_key).
+by rewrite /LRA_interpret_af linearN mulNmx (mxE oppmx_key).
 Qed.
 
 Definition QFLRA_unDNF dim (lss : seq (seq (LRA_literal dim))) :=

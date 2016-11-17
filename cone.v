@@ -65,9 +65,9 @@ rewrite /dual_cone; constructor => /=.
 - by move => x H; rewrite trmx_const mul0mx posmx0.
 - move => x y Hx Hy z H.
   move: (Hx _ H) (Hy _ H) => {Hx Hy} Hx Hy.
-  by rewrite trmxD mulmxDl posmx_add.
+  by rewrite linearD mulmxDl posmx_add.
 - move => a x Ha H y H0.
-  by rewrite trmx_scale -scalemxAl posmx_mx11 mxE;
+  by rewrite linearZ -scalemxAl posmx_mx11 mxE;
     apply mulr_ge0 => //; rewrite -posmx_mx11; apply H.
 Qed.
 

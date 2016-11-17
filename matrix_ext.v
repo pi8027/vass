@@ -10,16 +10,6 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Lemma trmxD (R : zmodType) m n : {morph @trmx R m n : x y / (x + y)}%R.
-Proof. by move => x y; apply/matrixP => i j; rewrite !mxE. Qed.
-
-Lemma trmxN (R : zmodType) m n : {morph @trmx R m n : x / - x}%R.
-Proof. by move => x; apply/matrixP => i j; rewrite !mxE. Qed.
-
-Lemma trmx_scale (R : ringType) m n (a : R) :
-  {morph @trmx _ m n : x / (a *: x)}%R.
-Proof. by move => x; apply/matrixP => i j; rewrite !mxE. Qed.
-
 Lemma row_permI (R : Type) (m n : nat) (p : 'S_m) :
   injective (@row_perm R m n p).
 Proof.
@@ -57,10 +47,7 @@ Proof. by rewrite trmx_mul trmxK. Qed.
 Lemma trmx_sum (R : ringType) m n (I : Type) (r : seq I) (P : I -> bool)
                (A_ : I -> 'M[R]_(m, n)) :
   (\sum_(i <- r | P i) A_ i)^T%R = (\sum_(i <- r | P i) (A_ i)^T)%R.
-Proof.
-apply (big_rec2 (fun x y => x^T = y)%R); first by rewrite trmx0.
-by move => i B C H <-; rewrite trmxD.
-Qed.
+Proof. rewrite (@big_morph _ _ trmx 0%R +%R) ?trmx0 //; exact: linearD. Qed.
 
 Lemma mulmx_row_col (R : ringType) m n p (A : 'M[R]_(m, n)) (B : 'M[R]_(n, p))
                     (i : 'I_m) (j : 'I_p) :
@@ -269,7 +256,7 @@ Qed.
 
 Lemma lermx_mx11 (mx1 mx2 : 'M_1) : (mx1 <=m mx2)%R = (mx1 0 0 <= mx2 0 0)%R.
 Proof.
-by apply/lermxP; case: ifP => [H i j | /negP H0 H]; [rewrite !ord1 | apply: H0].
+by apply/lermxP/idP; first apply; move => H i j; rewrite !ord1.
 Qed.
 
 Lemma posmx_mx11 (mx : 'M_1) : posmx mx = (0 <= mx 0 0)%R.
@@ -645,7 +632,7 @@ suff [x]: exists x : 'cV_n,
 apply Farkas_subproof_converse => y.
 rewrite -(vsubmxK y) -(vsubmxK (usubmx y)) !posmx_col !tr_col_mx !mul_row_col.
 move: (usubmx (usubmx y)) (dsubmx (usubmx y)) (dsubmx y) => u v w.
-by rewrite -andbA !trmxN !mulNmx trmx1 mul1mx mulmx0 addr0
+by rewrite -andbA !linearN /= !mulNmx trmx1 mul1mx mulmx0 addr0
   => /and3P [H0 H1 H2] /eqP; rewrite subr_eq0 => /eqP H3; subst w; move: H2;
-  rewrite mulmxN -mulmxBl -mulmxBr -trmxN -trmxD mulmx_trl posmx_trmx => /H.
+  rewrite -mulmxBl -mulmxBr -!linearN -linearD /= mulmx_trl posmx_trmx => /H.
 Qed.

@@ -158,10 +158,10 @@ elim: f b1 b2 => //=.
   rewrite (IH1 true b2) (IH2 true b2) big_distrlr big_allpairs /=.
   by apply eq_bigr => i _; apply eq_bigr => j _; rewrite big_cat.
 - move => q b1 []; last by case: b1; rewrite !big_cons !big_nil !andbT !orbF.
-  case: q => [| m] n t /=;
-    first by rewrite !big_cons !big_nil /= -(ltz_addr1 _ (_ - _ + _)) addrAC
-                     subrK trmxN mulNmx (mxE oppmx_key) -opprD oppr_gt0 -lerNgt;
-             case: b1; rewrite orbF andbT.
+  case: q => [| m] n t /=; first by
+    rewrite !big_cons !big_nil /= -(ltz_addr1 _ (_ - _ + _)) addrAC
+            subrK linearN mulNmx (mxE oppmx_key) -opprD oppr_gt0 -lerNgt;
+    case: b1; rewrite orbF andbT.
   suff Hdvdz x : (m.+1 %| x)%Z =
                  ~~ has (fun i => m.+1 %| (i%:Z + x)%R)%Z (iota 1 m)
     by rewrite Hdvdz -all_predC -big_all; case: b1 => /=;
@@ -342,7 +342,7 @@ rewrite -(vsubmxK t) tr_col_mx (mxE col_mx_key);
 by (case: (ltrgtP (t 0 0) 0)%R (prod_coef_cml Hf);
       last by move => -> _ /=; rewrite mul0r add0r andbT);
   rewrite dvdz_eq => /= H /eqP H0;
-  rewrite ?andbT trmx_scale -scalemxAl (mxE scalemx_key) -mulrDr
+  rewrite ?andbT linearZ /= -scalemxAl (mxE scalemx_key) -mulrDr
           -1?[RHS](ler_nmul2l H) -1?[RHS](ler_pmul2l H) mulrA mulrN
           [X in (- X)%R](mulrC (t _ _)) H0 mulNr -mulrN mulrCA ler_pmul2l
           ?ltz_nat ?prod_coef_gt0 // -(subr_ge0 (- _)%R) opprK (addrCA n).
@@ -369,7 +369,7 @@ move: (prod_coef_cmm Hf) prod_coef_gt0.
 rewrite H /= => /dvdzP [prod_coef' H0] /lt0n_neq0.
 rewrite -eqz_nat H0 mulzK ?H // mulf_eq0 H /= orbF => H1.
 by rewrite prednK ?ltz_nat ?muln_gt0 /= ?absz_gt0 //
-           trmx_scale -scalemxAl (mxE scalemx_key) -mulrA (mulrC n) -!mulrDr
+           linearZ /= -scalemxAl (mxE scalemx_key) -mulrA (mulrC n) -!mulrDr
            [RHS]dvdzE PoszM abszM /(`|Posz `|_| |) -abszM -dvdzE
            (mulrC _%:Z%Z) dvdz_mul2l // addrA.
 Qed.
@@ -436,11 +436,11 @@ apply (iffP andP) => -[H0 H]; (split; first apply H0);
   rewrite mem_iota /= add0n exists_conj_elim_mod_correct => H0 /andP [H1 H2].
   exists (j.1 + (j.2^T *m I) 0 0 + k)%R; move: H1.
   rewrite -{1}(addr0 (j.1 + _)%R) ler_add2l /=
-          trmxD trmxN mulmxDl mulNmx mxE (mxE oppmx_key) addrA
+          linearD linearN mulmxDl mulNmx mxE (mxE oppmx_key) addrA
           2!(addrAC _ (- k%:Z)%R) (addrAC _ (- j.1)%R) -2!addrA -2!opprD addrA
           subr_ge0 => -> /=.
   apply/allP => /= f; move/(allP H2); congr dvdz.
-  by rewrite trmxD mulmxDl mxE (addrAC j.1) !addrA addrAC.
+  by rewrite linearD /= mulmxDl mxE (addrAC j.1) !addrA addrAC.
 - case => x Hx; rewrite QFLIA_disj_has has_map; apply/hasP.
   exists `|x %% prod_mod|%Z => /=.
   + rewrite mem_iota /= add0n -ltz_nat gez0_abs; first by apply ltz_pmod.
@@ -460,7 +460,7 @@ apply (iffP andP) => -[H0 H]; (split; first apply H0);
           apply/andP; split => /=).
   + by rewrite mem_iota /= add0n -ltz_nat gez0_abs ?ltz_pmod //;
        apply modz_ge0; rewrite eqz_nat; apply lt0n_neq0.
-  + rewrite trmxD trmxN mulmxDl mulNmx (mxE addmx_key) (mxE oppmx_key).
+  + rewrite linearD linearN /= mulmxDl mulNmx (mxE addmx_key) (mxE oppmx_key).
     rewrite addrA 3!(addrAC _ (- _)%R) -2!addrA -!opprD subr_ge0.
     apply: (ler_trans _ H0).
     rewrite -subr_ge0 addrA (opprD (_ + _)%R) addrA subr_ge0.
@@ -468,9 +468,9 @@ apply (iffP andP) => -[H0 H]; (split; first apply H0);
   + rewrite exists_conj_elim_mod_correct;
       apply/allP => /= f Hf; move: (allP H1 _ Hf);
       rewrite !dvdzE'; congr eq_op; apply/eqP.
-    rewrite addrAC trmxD mulmxDl (mxE addmx_key) addrA (addrAC f.1.2 (_ + _)%R)
-            -(addrA (f.1.2 + _)%R) eqz_modDl eqz_mod_dvd
-            (addrAC j.1) opprD addrA -eqz_mod_dvd modz_dvdm //.
+    rewrite addrAC linearD /= mulmxDl (mxE addmx_key) addrA
+            (addrAC f.1.2 (_ + _)%R) -(addrA (f.1.2 + _)%R) eqz_modDl
+            eqz_mod_dvd (addrAC j.1) opprD addrA -eqz_mod_dvd modz_dvdm //.
     by apply prod_mod_cm.
 Transparent fs_leq0 fs_leq1 fs_mod0 fs_mod1.
 Qed.
@@ -506,8 +506,9 @@ apply (iffP hasP).
   exists (exists_conj_elim ls).
   + by apply map_f.
   + apply/exists_conj_elimP; exists x.
-    by rewrite all_cat !all_map !all_pmap -all_predI; apply/allP => l /(allP H0);
-      case: l => //= n t; rewrite andbT.
+    by rewrite all_cat !all_map !all_pmap -all_predI;
+       apply/allP => l /(allP H0);
+       case: l => //= n t; rewrite andbT.
 Qed.
 
 Fixpoint Presburger_algorithm dim (f : LIA_formula dim) : QFLIA_formula dim :=
