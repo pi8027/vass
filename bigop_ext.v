@@ -1,5 +1,5 @@
 From mathcomp Require Import all_ssreflect all_algebra.
-Import GRing.Theory Num.Theory.
+Import Order.TTheory GRing.Theory Num.Theory.
 
 (******************************************************************************)
 (*  extensions for bigop                                                      *)
@@ -65,18 +65,12 @@ Export Semilattice.Exports.
 
 Section PervasiveSemilattices.
 
-Import Semilattice.
+Variable (disp : unit) (T : latticeType disp).
 
-Canonical andb_semilattice := Law andbA andbC andbb.
-Canonical orb_semilattice := Law orbA orbC orbb.
-
-Canonical maxn_semilattice := Law maxnA maxnC maxnn.
-Canonical minn_semilattice := Law minnA minnC minnn.
-
-Variable (R : realDomainType).
-
-Canonical maxr_semilattice := Law (@maxrA R) (@maxrC R) (@maxrr R).
-Canonical minr_semilattice := Law (@minrA R) (@minrC R) (@minrr R).
+Canonical maxr_semilattice :=
+  Semilattice.Law (@joinA _ T) (@joinC _ T) (@joinxx _ T).
+Canonical minr_semilattice :=
+  Semilattice.Law (@meetA _ T) (@meetC _ T) (@meetxx _ T).
 
 End PervasiveSemilattices.
 
@@ -118,7 +112,7 @@ Lemma big_mkcond_l I r (P : pred I) F :
      \big[||%L/0]_(i <- r) (if P i then F i else 0).
 Proof.
 elim: r => /= [| i r IH]; first by rewrite !big_nil.
-by rewrite !big_cons {}IH; case P => //; rewrite big_join0.
+by rewrite !big_cons {}IH; case: (P); rewrite // big_join0.
 Qed.
 
 Lemma big_mkcondr_l I r (P Q : pred I) F :
@@ -160,7 +154,7 @@ Qed.
 Lemma big_nat_recr_l n m F : m <= n ->
   \big[||%L/0]_(m <= i < n.+1) F i = (\big[||%L/0]_(m <= i < n) F i) || F n.
 Proof.
-move => lemn; rewrite (@big_cat_nat_l n) ?leqnSn //.
+move=> lemn; rewrite (@big_cat_nat_l n) ?leqnSn //.
 rewrite (big_ltn (leqnn n.+1)) (big_geq (leqnn n.+1)).
 by rewrite joinC -joinA big_join0 joinC.
 Qed.
@@ -170,10 +164,10 @@ Lemma big_ord_recr_l n F :
      (\big[||%L/0]_(i < n) F (widen_ord (leqnSn n) i)) || F ord_max.
 Proof.
 transitivity (\big[||%L/0]_(0 <= i < n.+1) F (inord i)).
-  by rewrite big_mkord; apply: eq_bigr=> i _; rewrite inord_val.
+  by rewrite big_mkord; apply: eq_bigr => i _; rewrite inord_val.
 rewrite big_nat_recr_l // big_mkord; congr (_ || F _); last first.
   by apply: val_inj; rewrite /= inordK.
-by apply: eq_bigr => [] i _; congr F; apply: ord_inj; rewrite inordK //= leqW.
+by apply/eq_bigr => [] i _; congr F; apply: ord_inj; rewrite inordK //= leqW.
 Qed.
 
 Lemma big_sumType_l (I1 I2 : finType) (P : pred (I1 + I2)) F :
@@ -206,20 +200,20 @@ Lemma eq_big_perm_l (I : eqType) r1 r2 (P : pred I) F :
     perm_eq r1 r2 ->
   \big[||%L/0]_(i <- r1 | P i) F i = \big[||%L/0]_(i <- r2 | P i) F i.
 Proof.
-move/perm_eqP; rewrite !(big_mkcond_l _ P).
+move/permP; rewrite !(big_mkcond_l _ P).
 elim: r1 r2 => [|i r1 IHr1] r2 eq_r12.
   by case: r2 eq_r12 => // i r2; move/(_ (pred1 i)); rewrite /= eqxx.
 have r2i: i \in r2 by rewrite -has_pred1 has_count -eq_r12 /= eqxx.
 case/splitPr: r2 / r2i => [r3 r4] in eq_r12 *; rewrite big_cat_l /= !big_cons.
 rewrite joinCA; congr (_ || _); rewrite -big_cat_l; apply: IHr1 => a.
-by move/(_ a): eq_r12; rewrite !count_cat /= addnCA; apply: addnI.
+move/(_ a): eq_r12; rewrite !count_cat /= addnCA; exact: addnI.
 Qed.
 
 Lemma big_uniq_l (I : finType) (r : seq I) F :
   uniq r -> \big[||%L/0]_(i <- r) F i = \big[||%L/0]_(i in r) F i.
 Proof.
 move=> uniq_r; rewrite -(big_filter _ (mem r)); apply: eq_big_perm_l.
-by rewrite filter_index_enum uniq_perm_eq ?enum_uniq // => i; rewrite mem_enum.
+by rewrite filter_index_enum uniq_perm ?enum_uniq // => i; rewrite mem_enum.
 Qed.
 
 Lemma big_rem_l (I : eqType) r x (P : pred I) F :
@@ -244,7 +238,7 @@ Lemma eq_big_idem_l (I : eqType) (r1 r2 : seq I) (P : pred I) F :
   \big[||%L/0]_(i <- r1 | P i) F i = \big[||%L/0]_(i <- r2 | P i) F i.
 Proof.
 move=> eq_r; rewrite -big_undup_l // -(big_undup_l r2) //; apply/eq_big_perm_l.
-by rewrite uniq_perm_eq ?undup_uniq // => i; rewrite !mem_undup eq_r.
+by rewrite uniq_perm ?undup_uniq // => i; rewrite !mem_undup eq_r.
 Qed.
 
 Lemma big_undup_iterop_count_l (I : eqType) (r : seq I) (P : pred I) F :
@@ -276,10 +270,10 @@ Lemma bigID_l I r (a P : pred I) F :
 Proof.
 rewrite !(big_mkcond_l _ _ F) -big_split_l;
   elim: r => /= [| i r IH]; first by rewrite !big_nil.
-by rewrite !big_cons; case a; case P => //=;
+by rewrite !big_cons; case a; case: (P) => //=;
   rewrite -IH ?joinI // -joinA ?(joinCA _ 0) big_join0.
 Qed.
-Implicit Arguments bigID [I r].
+Arguments bigID_l [I r].
 
 Lemma bigD1_l (I : finType) j (P : pred I) F :
   P j -> \big[||%L/0]_(i | P i) F i = F j || \big[||%L/0]_(i | P i) F i.
@@ -287,30 +281,8 @@ Proof.
 move=> Pj.
 rewrite -{2}big_join0 joinA -(big_pred1_l (P := pred1 j)) // -bigU_l.
 apply/eq_bigl => i; do !rewrite unfold_in /= -?eqE.
-by rewrite orbC; case_eq (P i) => //; case: eqP Pj => // <- ->.
+by case: eqP Pj => //= <- ->.
 Qed.
-Implicit Arguments bigD1 [I P F].
+Arguments bigD1_l [I j P F].
 
 End SemilatticeProperties.
-
-Section MonoidProperties_ext.
-
-Variable R : Type.
-
-Variable idx : R.
-Notation Local "1" := idx.
-
-Variable op : Monoid.law 1.
-
-Notation "*%M" := op (at level 0).
-Notation "x * y" := (op x y).
-
-Lemma big_allpairs I J K xs ys (f : I -> J -> K) P F :
-  \big[*%M/1]_(k <- allpairs f xs ys | P k) F k =
-  \big[*%M/1]_(i <- xs) \big[*%M/1]_(j <- ys | P (f i j)) F (f i j).
-Proof.
-  elim: xs; first by rewrite !big_nil.
-  by move => x xs IH /=; rewrite big_cat big_cons big_map IH.
-Qed.
-
-End MonoidProperties_ext.

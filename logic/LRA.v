@@ -1,5 +1,5 @@
 From mathcomp Require Import all_ssreflect all_fingroup all_algebra zmodp.
-Import GroupScope GRing.Theory Num.Theory.
+Import GroupScope Order.TTheory GRing.Theory Num.Theory.
 Require Import utils algebra_ext matrix_ext.
 
 (******************************************************************************)
@@ -37,7 +37,7 @@ Fixpoint eq_QFLRA_formula (f1 f2 : QFLRA_formula) :=
 
 Lemma eq_QFLRA_formulaP : Equality.axiom eq_QFLRA_formula.
 Proof.
-move => f1 f2; apply: (iffP idP) => [| <-].
+move=> f1 f2; apply/(iffP idP) => [| <-].
 - by elim: f1 f2 =>
     [f1' IH | f1l IHl f1r IHr | f1l IHl f1r IHr | t1]
     [//= f2' /IH -> | | | //= t2 /eqP ->]
@@ -65,7 +65,7 @@ Definition LRA_literal dim := [eqType of bool * 'cV[R]_dim].
 Definition LRA_interpret_af dim (I f : 'cV[R]_dim) := ((f^T *m I) 0 0)%R.
 
 Definition LRA_interpret_literal dim (I : 'cV_dim) (f : LRA_literal dim) :=
-  lter f.1 0%R (LRA_interpret_af I f.2).
+  (0%R < LRA_interpret_af I f.2 ?<= if f.1)%O.
 
 Lemma LRA_af_recl dim (I f : 'cV_(1 + dim)) :
   LRA_interpret_af I f =
@@ -136,9 +136,9 @@ Lemma NF_neg_CNF dim (I : 'cV_dim) lss :
   ~~ all (has (LRA_interpret_literal I)) lss.
 Proof.
 rewrite /NF_neg /LRA_interpret_literal -has_predC has_map.
-apply eq_in_has => /= afs _; rewrite -all_predC all_map.
-apply eq_in_all => -[f t] _ /=; rewrite lterN -lter_opp2 oppr0.
-by congr lter; rewrite /LRA_interpret_af linearN mulNmx mxE opprK.
+apply/eq_in_has => /= afs _; rewrite -all_predC all_map.
+apply/eq_in_all => -[f t] _ /=; rewrite lteifNE -lteif_opp2 oppr0.
+by congr (~~ (_ < _ ?<= if _)%O); rewrite /LRA_interpret_af linearN mulNmx mxE.
 Qed.
 
 Lemma NF_neg_DNF dim (I : 'cV_dim) lss :
@@ -146,9 +146,9 @@ Lemma NF_neg_DNF dim (I : 'cV_dim) lss :
   ~~ has (all (LRA_interpret_literal I)) lss.
 Proof.
 rewrite /NF_neg /LRA_interpret_literal -all_predC all_map.
-apply eq_in_all => /= afs _; rewrite -has_predC has_map.
-apply eq_in_has => -[f t] _ /=; rewrite lterN -lter_opp2 oppr0.
-by congr lter; rewrite /LRA_interpret_af linearN mulNmx mxE opprK.
+apply/eq_in_all => /= afs _; rewrite -has_predC has_map.
+apply/eq_in_has => -[f t] _ /=; rewrite lteifNE -lteif_opp2 oppr0.
+by congr (~~ (_ < _ ?<= if _)%O); rewrite /LRA_interpret_af linearN mulNmx mxE.
 Qed.
 
 Fixpoint
@@ -175,19 +175,19 @@ Lemma QFLRA_NF_correctness dim (I : 'cV_dim) (f : QFLRA_formula dim) :
   (all (has (LRA_interpret_literal I)) (QFLRA_CNF f) =
      QFLRA_interpret_formula I f).
 Proof.
-move: f; refine (@QFLRA_formula_ind dim _ _ _ _ _) => /=.
-- by move => q [] {3}<- <-; rewrite NF_neg_CNF NF_neg_DNF.
-- move => q1 [] {2}<- <- q2 [] {2}<- <-; split; last by rewrite all_cat.
+elim: f => /=.
+- by move=> q [] {3}<- <-; rewrite NF_neg_CNF NF_neg_DNF.
+- move=> q1 [] {2}<- <- q2 [] {2}<- <-; split; last by rewrite all_cat.
   elim: (QFLRA_DNF q1) => //= qs qss IH.
   rewrite has_cat {}IH andb_orl; congr orb.
   elim: (QFLRA_DNF q2); rewrite /= ?andbF => // qs' qss' IH.
   by rewrite all_cat {}IH andb_orr.
-- move => q1 [] {2}<- <- q2 [] {2}<- <-; split; first by rewrite has_cat.
+- move=> q1 [] {2}<- <- q2 [] {2}<- <-; split; first by rewrite has_cat.
   elim: (QFLRA_CNF q1) => //= qs qss IH.
   rewrite all_cat {}IH orb_andl; congr andb.
   elim: (QFLRA_CNF q2); rewrite /= ?orbT => // qs' qss' IH.
   by rewrite has_cat {}IH orb_andr.
-- by move => f; rewrite !andbT !orbF /=.
+- by move=> f; rewrite !andbT !orbF /=.
 Qed.
 
 Definition QFLRA_DNF_correctness dim (I : 'cV_dim) (f : QFLRA_formula dim) :=
@@ -203,7 +203,7 @@ Lemma QFLRA_l2f_correctness dim (I : 'cV_dim) (l : LRA_literal dim) :
   LRA_interpret_literal I l = QFLRA_interpret_formula I (QFLRA_l2f l).
 Proof.
 rewrite /QFLRA_l2f /LRA_interpret_literal; case: l.1 => //=.
-rewrite -ltrNge -subr_lt0 sub0r; congr (_ < _)%R.
+rewrite -ltNge -subr_lt0 sub0r; congr (_ < _)%R.
 by rewrite /LRA_interpret_af linearN mulNmx (mxE oppmx_key).
 Qed.
 
@@ -218,9 +218,9 @@ Lemma QFLRA_unDNF_correctness
   QFLRA_interpret_formula I (QFLRA_unDNF lss).
 Proof.
 elim: lss; first by rewrite /foldr QFLRA_bot_false.
-move => /= ls lss ->; congr orb.
+move=> /= ls lss ->; congr orb.
 elim: ls {lss}; first by rewrite /foldr QFLRA_top_true.
-move => /= l ls ->; congr andb; apply QFLRA_l2f_correctness.
+move=> /= l ls ->; congr andb; exact: QFLRA_l2f_correctness.
 Qed.
 
 Definition exists_conj_elim
@@ -244,20 +244,21 @@ Definition exists_conj_elim
 Definition literal_interval dim (I : 'cV_dim) (l : LRA_literal (1 + dim)) :=
   let r := (- LRA_interpret_af I (dsubmx l.2) / l.2 0 0)%R in
   if (l.2 0 0 == 0)%R
-  then if LRA_interpret_literal I (l.1, dsubmx l.2) then itv1 else itv0
-  else if (0 < l.2 0 0)%R then Interval (BOpen_if (~~ l.1) r) (BInfty _)
-                           else Interval (BInfty _) (BOpen_if (~~ l.1) r).
+  then if LRA_interpret_literal I (l.1, dsubmx l.2) then
+         `]-oo, +oo[%O else `]0%R, 0%R[%O
+  else if (0 < l.2 0 0)%R then Interval (BSide l.1 r) (BInfty _ false)
+                          else Interval (BInfty _ true) (BSide (~~ l.1) r).
 
 Lemma literal_intervalE dim x0 (I : 'cV_dim) (l : LRA_literal (1 + dim)) :
   LRA_interpret_literal (col_mx (const_mx x0) I) l =
   (x0 \in literal_interval I l).
 Proof.
-rewrite /literal_interval /LRA_interpret_literal LRA_af_recl
-        /LRA_interpret_af trmx_dsub mxE split1 unlift_none /= mxE col_mxKd.
+rewrite /literal_interval /LRA_interpret_literal LRA_af_recl.
+rewrite /LRA_interpret_af trmx_dsub mxE split1 unlift_none /= mxE col_mxKd.
 case: (ltrgtP (l.2 0 0) 0)%R => /= H;
-  try by rewrite inE /= ?andbT addrC -lternE negbK addr_lte0r
-                 (lter_ndivl_mulr, lter_pdivr_mulr) // mulrC.
-by rewrite H mul0r add0r; case: (lter l.1 _ _); rewrite ?(itv1E, itv0E).
+  try by rewrite in_itv /= (negbK, andbT) addrC addr_lteif0r
+                 (lteif_ndivl_mulr, lteif_pdivr_mulr) // mulrC.
+by rewrite H mul0r add0r; case: Order.lteif; rewrite // in_itv lt_asym.
 Qed.
 
 Lemma exists_conj_elimP dim I (ls : seq (LRA_literal (1 + dim))) :
@@ -273,37 +274,35 @@ have af_decomp (l1 l2 : LRA_literal (1 + dim)) :
   by rewrite /LRA_interpret_af mulmx_trl mulmxBr -!scalemxAr
              2!mxE (mxE oppmx_key);
     congr (_ - _)%R; rewrite mulmx_trl !mxE.
-apply (iffP idP); rewrite /exists_conj_elim all_cat.
+apply/(iffP idP); rewrite /exists_conj_elim all_cat.
 - case/andP; rewrite all_map => H /all_allpairsP H0.
-  suff: itv_isnot0
-          (\big[itv_intersection/itv1]_(l <- ls) literal_interval I l)
-    by case/itv_isnot0P => /= x; rewrite -itv_bigIE => H1; exists x;
+  suff: itv_nonempty
+          (\big[Order.meet/`]-oo, +oo[%O]_(l <- ls) literal_interval I l)
+    by case/itv_nonemptyP => /= x; rewrite in_itv_bigI => H1; exists x;
       apply/allP => /= l /(allP H1); rewrite literal_intervalE.
   have H1 (l : LRA_literal dim.+1) :
-    (l.2 0 0 == 0)%R -> l \in ls -> literal_interval I l = itv1
-    by move => H1 H2; rewrite /literal_interval H1;
+    (l.2 0 0 == 0)%R -> l \in ls -> literal_interval I l = `]-oo, +oo[%O
+    by move=> H1 H2; rewrite /literal_interval H1;
        move: (allP H l); rewrite mem_filter H1 H2 /= => /(_ isT) ->.
   rewrite itv_bigI_pairwise0;
     apply/allP => /= itv /allpairsP [] [] /= l1 l2 [H2 H3 H4]; subst itv.
   case_eq (l1.2 0 0 == 0)%R => H4;
-    first rewrite (H1 l1) // itv_intersection1i {H4};
+    first rewrite (H1 l1) // meet1x {H4};
     (case_eq (l2.2 0 0 == 0)%R => H5;
-     first rewrite (H1 l2) // ?itv_intersectioni1 {H5});
+     first rewrite (H1 l2) // ?meetx1 {H5});
     rewrite /literal_interval ?H4 ?H5;
-    do !case: ifP => //=; move => H6 H7; try rewrite -negb_and negbK.
-  + have {H4 H5 H6} H4: (l2.2 0 0 < 0)%R
-      by rewrite ltrNge ler_eqVlt eq_sym H5 H6.
+    do !case: ifP => //=; move=> H6 H7; try rewrite -negb_and negbK.
+  + have {H5 H6} {}H4: (l2.2 0 0 < 0)%R by rewrite ltNge le_eqVlt eq_sym H5 H6.
     move: (H0 l1 l2).
-    by rewrite !mem_filter H2 H3 H4 H7 /LRA_interpret_literal /=
-               lter_pdivr_mulr // mulrAC lter_ndivl_mulr // !mulNr
-               -addr_lte0r af_decomp !(mulrC (LRA_interpret_af _ _))%R => ->.
-  + have {H4 H5 H7} H4: (l1.2 0 0 < 0)%R
-      by rewrite ltrNge ler_eqVlt eq_sym H4 H7.
+    by rewrite negbK !mem_filter H2 H3 H4 H7 /LRA_interpret_literal /=
+               lteif_pdivr_mulr // mulrAC lteif_ndivl_mulr // !mulNr
+               -addr_lteif0r af_decomp !(mulrC (LRA_interpret_af _ _))%R => ->.
+  + have {H5 H7} {}H4: (l1.2 0 0 < 0)%R by rewrite ltNge le_eqVlt eq_sym H4 H7.
     move: (H0 l2 l1).
-    by rewrite !mem_filter H2 H3 H4 H6 /LRA_interpret_literal /=
-               lter_pdivr_mulr // mulrAC lter_ndivl_mulr // !mulNr
-               -addr_lte0r af_decomp !(mulrC (LRA_interpret_af _ _))%R => ->.
-- case => x H; apply/andP; split.
+    by rewrite negbK !mem_filter H2 H3 H4 H6 /LRA_interpret_literal /=
+               lteif_pdivr_mulr // mulrAC lteif_ndivl_mulr // !mulNr
+               -addr_lteif0r af_decomp !(mulrC (LRA_interpret_af _ _))%R => ->.
+- case=> x H; apply/andP; split.
   + rewrite all_map; apply/allP => /= l; rewrite mem_filter =>
       /andP [/eqP H0 /(allP H)].
     by rewrite /LRA_interpret_literal LRA_af_recl !mxE;
@@ -313,9 +312,9 @@ apply (iffP idP); rewrite /exists_conj_elim all_cat.
                                /andP [H2] /(allP H) H3 ->.
     move: H0 H2 H1 H3.
     rewrite /LRA_interpret_literal /= !LRA_af_recl !mxE;
-      case: splitP => i // _; rewrite ord1 !addr_lte0r af_decomp subr_lte0r.
-    move => /(lter_pmul2l l2.1) <- /(lter_nmul2l l1.1) <-.
-    rewrite !mulrN mulrCA col_mxKd !mxE; apply lter_trans.
+      case: splitP => i // _; rewrite ord1 !addr_lteif0r af_decomp subr_lteif0r.
+    move=> /(lteif_pmul2l l2.1) <- /(lteif_nmul2l l1.1) <-.
+    rewrite !mulrN mulrCA col_mxKd !mxE; exact: lteif_trans.
 Qed.
 
 Definition exists_DNF_elim dim (lss : seq (seq (LRA_literal dim.+1))) :
@@ -327,13 +326,11 @@ Lemma exists_DNF_elimP dim I (lss : seq (seq (LRA_literal (1 + dim)))) :
              has (all (LRA_interpret_literal (col_mx (const_mx x) I))) lss)
           (QFLRA_interpret_formula I (exists_DNF_elim lss)).
 Proof.
-rewrite /exists_DNF_elim -QFLRA_unDNF_correctness.
-apply (iffP hasP).
-- case => /= ls' /mapP [] /= ls H -> {ls'} /exists_conj_elimP [] x H0.
+rewrite /exists_DNF_elim -QFLRA_unDNF_correctness; apply/(iffP hasP).
+- case=> /= ls' /mapP [] /= ls H -> {ls'} /exists_conj_elimP [] x H0.
   by exists x; apply/hasP => /=; exists ls.
-- case => x /hasP [] /= ls H H0; exists (exists_conj_elim ls).
-  + by apply map_f.
-  + by apply/exists_conj_elimP; exists x.
+- case=> x /hasP [] ls H H0; exists (exists_conj_elim ls); first exact: map_f.
+  by apply/exists_conj_elimP; exists x.
 Qed.
 
 Fixpoint Fourier_Motzkin dim (f : LRA_formula dim) : QFLRA_formula dim :=
@@ -354,26 +351,24 @@ Lemma Fourier_MotzkinP dim I (f : LRA_formula dim) :
   reflect (LRA_interpret_formula I f)
           (QFLRA_interpret_formula I (Fourier_Motzkin f)).
 Proof.
-move: dim f I.
-refine (LRA_formula_rect _ _ _ _ _ _ _) => //= dim.
-- move => f IH I; apply/(iffP idP).
-  + move/exists_DNF_elimP => H x; apply/IH.
-    apply/negP => /negP H0; apply: H; exists x.
+elim/LRA_formula_rect: dim / f I => //= dim.
+- move=> f IH I; apply/(iffP idP) => [/exists_DNF_elimP H x|H].
+  + apply/IH/negP => /negP H0; apply: H; exists x.
     by rewrite NF_neg_CNF QFLRA_NF_correctness.
-  + move => H; apply/negP => /exists_DNF_elimP [x].
-    by rewrite NF_neg_CNF QFLRA_NF_correctness => /IH; apply; apply H.
-- by move => f IH l; apply/(iffP (exists_DNF_elimP _ _));
-     move => [x H]; exists x; move: H;
+  + apply/negP => /exists_DNF_elimP [x].
+    rewrite NF_neg_CNF QFLRA_NF_correctness => /IH; apply; exact: H.
+- by move=> f IH l; apply/(iffP (exists_DNF_elimP _ _));
+     move=> [x H]; exists x; move: H;
      rewrite QFLRA_NF_correctness => /IH.
-- by move => f IH I; apply/(iffP idP); move/IH.
-- by move => f1 IH1 f2 IH2 I; apply/(iffP andP); case => /IH1 H /IH2 H0.
-- by move => f1 IH1 f2 IH2 I; apply/(iffP orP);
+- by move=> f IH I; apply/(iffP idP); move/IH.
+- by move=> f1 IH1 f2 IH2 I; apply/(iffP andP); case=> /IH1 H /IH2 H0.
+- by move=> f1 IH1 f2 IH2 I; apply/(iffP orP);
     (case; [move/IH1; left | move/IH2; right]).
-- by move => f1 IH1 f2 IH2 I;
-    rewrite -implybE; apply(iffP implyP) => H /IH1 /H /IH2.
-- move => t I; rewrite mxE.
+- by move=> f1 IH1 f2 IH2 I;
+    rewrite -implybE; apply/(iffP implyP) => H /IH1 /H /IH2.
+- move=> t I; rewrite mxE.
   set r1 := (\sum_i _)%R; set r2 := (\sum_i _)%R.
-  suff ->: r1 = r2 by apply idP.
+  suff ->: r1 = r2 by exact: idP.
   by subst r1 r2; apply/eq_bigr => /= i _; rewrite !mxE.
 Qed.
 

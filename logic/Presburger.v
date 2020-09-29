@@ -1,6 +1,6 @@
 From mathcomp Require Import all_ssreflect all_fingroup all_algebra zmodp.
 Require Import utils algebra_ext bigop_ext matrix_ext.
-Import GroupScope GRing.Theory Num.Theory.
+Import GroupScope Order.TTheory GRing.Theory Num.Theory.
 
 (******************************************************************************)
 (*  Presburger arithmetic                                                     *)
@@ -38,9 +38,9 @@ Definition eq_QFLIA_af (f1 f2 : QFLIA_af) :=
 
 Lemma eq_QFLIA_afP : Equality.axiom eq_QFLIA_af.
 Proof.
-move => f1 f2; apply: (iffP idP) => [| <-].
+move=> f1 f2; apply: (iffP idP) => [| <-].
 - by case: f1 f2 => [| ml] nl tl [nr tr //= /andP | mr nr tr //= /and3P] [];
-    do ! move/eqP => ->.
+    do ! move/eqP=> ->.
 - by case: f1 => [| m] n t /=; rewrite !eqxx.
 Qed.
 
@@ -60,7 +60,7 @@ Fixpoint eq_QFLIA_formula (f1 f2 : QFLIA_formula) :=
 
 Lemma eq_QFLIA_formulaP : Equality.axiom eq_QFLIA_formula.
 Proof.
-move => f1 f2; apply: (iffP idP) => [| <-].
+move=> f1 f2; apply: (iffP idP) => [| <-].
 - by elim: f1 f2 =>
     [f1 IHf1 | f1l IHf1l f1r IHf1r | f1l IHf1l f1r IHf1r | f1]
     [//= f2 /IHf1 -> | //= f2l f2r /andP [] /IHf1l -> /IHf1r -> |
@@ -106,12 +106,12 @@ Definition QFLIA_disj (fs : seq QFLIA_formula) := foldr QFLIA_or QFLIA_bot fs.
 Lemma QFLIA_conj_all fs (I : 'cV_dim) :
   QFLIA_interpret_formula I (QFLIA_conj fs) =
   all (QFLIA_interpret_formula I) fs.
-Proof. by elim: fs => [| f fs /= -> //]; apply QFLIA_top_true. Qed.
+Proof. elim: fs => [| f fs /= -> //]; exact: QFLIA_top_true. Qed.
 
 Lemma QFLIA_disj_has fs (I : 'cV_dim) :
   QFLIA_interpret_formula I (QFLIA_disj fs) =
   has (QFLIA_interpret_formula I) fs.
-Proof. by elim: fs => [| f fs /= -> //]; apply QFLIA_bot_false. Qed.
+Proof. elim: fs => [| f fs /= -> //]; exact: QFLIA_bot_false. Qed.
 
 Fixpoint QFLIA_NF (f : QFLIA_formula) b1 b2 : seq (seq QFLIA_af) :=
   match f with
@@ -146,39 +146,39 @@ Lemma QFLIA_NF_correctness' b1 b2 I (f : QFLIA_formula) :
       (b2 (+) QFLIA_interpret_af I af).
 Proof.
 elim: f b1 b2 => //=.
-- move => f IH b1 b2.
+- move=> f IH b1 b2.
   by rewrite (IH (~~ b1) (~~ b2)); case: b1 => //=;
-    do ! (rewrite big_has big_all -all_predC; apply eq_in_all => afs _ /=) ||
-         (rewrite big_has big_all -has_predC; apply eq_in_has => af _ /=);
+    do ! (rewrite big_has big_all -all_predC; apply/eq_in_all => afs _ /=) ||
+         (rewrite big_has big_all -has_predC; apply/eq_in_has => af _ /=);
     rewrite addNb negbK.
-- move => f1 IH1 f2 IH2 [] b2; first by rewrite big_cat /= -IH1 -IH2.
-  rewrite (IH1 false b2) (IH2 false b2) big_distrlr big_allpairs /=.
-  by apply eq_bigr => i _; apply eq_bigr => j _; rewrite big_cat.
-- move => f1 IH1 f2 IH2 [] b2 /=; last by rewrite big_cat /= -IH1 -IH2.
-  rewrite (IH1 true b2) (IH2 true b2) big_distrlr big_allpairs /=.
-  by apply eq_bigr => i _; apply eq_bigr => j _; rewrite big_cat.
-- move => q b1 []; last by case: b1; rewrite !big_cons !big_nil !andbT !orbF.
+- move=> f1 IH1 f2 IH2 [] b2; first by rewrite big_cat /= -IH1 -IH2.
+  rewrite (IH1 false b2) (IH2 false b2) big_distrlr big_allpairs_dep.
+  by apply/eq_bigr => i _; apply/eq_bigr => j _; rewrite big_cat.
+- move=> f1 IH1 f2 IH2 [] b2 /=; last by rewrite big_cat /= -IH1 -IH2.
+  rewrite (IH1 true b2) (IH2 true b2) big_distrlr big_allpairs_dep /=.
+  by apply/eq_bigr => i _; apply/eq_bigr => j _; rewrite big_cat.
+- move=> q b1 []; last by case: b1; rewrite !big_cons !big_nil !andbT !orbF.
   case: q => [| m] n t /=; first by
     rewrite !big_cons !big_nil /= -(ltz_addr1 _ (_ - _ + _)) addrAC
-            subrK linearN mulNmx (mxE oppmx_key) -opprD oppr_gt0 -lerNgt;
+            subrK linearN mulNmx (mxE oppmx_key) -opprD oppr_gt0 -leNgt;
     case: b1; rewrite orbF andbT.
   suff Hdvdz x : (m.+1 %| x)%Z =
                  ~~ has (fun i => m.+1 %| (i%:Z + x)%R)%Z (iota 1 m)
     by rewrite Hdvdz -all_predC -big_all; case: b1 => /=;
-       rewrite ?(big_cons, big_nil, big_map, orbF); apply eq_bigr => i _;
+       rewrite ?(big_cons, big_nil, big_map, orbF); apply/eq_bigr => i _;
        rewrite ?(big_cons, big_nil, big_map, orbF) /= addrCA addrA natz.
   apply/esym/hasPn; case: ifP => [| H0] H /=; last (apply/notF; rewrite -{}H0).
-  + move => i; rewrite mem_iota add1n ltnS => /andP [H0 H1].
+  + move=> i; rewrite mem_iota add1n ltnS => /andP [H0 H1].
     apply/dvdz_mod0P; rewrite -modzDmr (dvdz_mod0P H) addr0 modz_small.
     * by case: i H0 H1.
     * by rewrite lez_nat ltz_nat ltnS H1.
   + move: {H} (H `|(m.+1%:Z - (x %% m.+1)%Z)%R|).
     have H: ((x %% m.+1)%Z < m.+1)%R by rewrite ltz_pmod.
-    rewrite mem_iota absz_gt0 subr_eq0 neqr_lt H orbT /= add1n ltnS.
-    move: (ltrW H); rewrite -lez_nat ler_def abszE => /eqP ->.
+    rewrite mem_iota absz_gt0 subr_eq0 neq_lt H orbT /= add1n ltnS.
+    move: (ltW H); rewrite -lez_nat ler_def abszE => /eqP ->.
     rewrite ler_sub_addl intS ler_add2r -intS.
-    move/implyP; rewrite implybN -ltrNge -(addr0 1%R) ltz_add1r => /implyP H0.
-    apply/dvdz_mod0P/eqP; rewrite eqr_le modz_ge0 // {}H0 //; apply/dvdz_mod0P.
+    move/implyP; rewrite implybN -ltNge -(addr0 1%R) ltz_add1r => /implyP H0.
+    apply/dvdz_mod0P/eqP; rewrite eq_le modz_ge0 // {}H0 //; apply/dvdz_mod0P.
     by rewrite -addrA modzDl addrC {1}(divz_eq x m.+1) -addrA modzMDl subrr.
 Qed.
 
@@ -191,7 +191,7 @@ Proof.
 rewrite (QFLIA_NF_correctness'  b1 false I f).
 elim: (QFLIA_NF _ _ _); first by rewrite big_nil; case: b1 => //.
 by case: b1 => fs fss IH; rewrite /= big_cons IH; [congr andb | congr orb];
-  (elim: fs; first by rewrite big_nil) => af fs IH';
+  (elim: fs; first by rewrite big_nil); move=> af fs IH';
   rewrite big_cons /=; [congr orb | congr andb].
 Qed.
 
@@ -225,13 +225,13 @@ Fixpoint interpret_formula dim (f : LIA_formula dim) : 'cV[int]_dim -> Prop :=
 
 Lemma modz_dvdm (m n d : int) : (d %| m)%Z -> ((n %% m)%Z = n %[mod d])%Z.
 Proof.
-by move/dvdzP => -[x ->]; rewrite {2}(divz_eq n (x * d)) mulrA modzMDl.
+by case/dvdzP => x ->; rewrite {2}(divz_eq n (x * d)) mulrA modzMDl.
 Qed.
 
 Lemma ler_mod m d : (0 <= m -> 0 < d -> (m %% d)%Z <= m)%R.
 Proof.
-by move => H H0; rewrite {2}(divz_eq m d) ler_addr;
-        apply mulr_ge0; [rewrite divz_ge0 | apply ltrW].
+by move=> H H0; rewrite {2}(divz_eq m d) ler_addr;
+  apply: mulr_ge0; [rewrite divz_ge0 | exact: ltW].
 Qed.
 
 Lemma dvdzE' (d m : int) : (d %| m)%Z = (m %% d == 0)%Z.
@@ -303,26 +303,24 @@ Qed.
 Lemma prod_coef_cml f :
   f \in fs_leq -> (f.2 0 0 == 0)%R || (f.2 0%R 0%R %| prod_coef%:Z)%Z.
 Proof.
-rewrite -(negbK (_ == _)) -implybE /prod_coef => H.
-apply/implyP => H0.
-rewrite (big_rem _ H) /= H0 !PoszM -mulrA; apply dvdz_mulr.
+rewrite -(negbK (_ == _)) -implybE /prod_coef => H; apply/implyP => H0.
+rewrite (big_rem _ H) /= H0 !PoszM -mulrA; apply: dvdz_mulr.
 by rewrite dvdzE absz_id dvdnn.
 Qed.
 
 Lemma prod_coef_cmm f :
   f \in fs_mod -> (f.2 0 0 == 0)%R || (f.2 0%R 0%R %| prod_coef%:Z)%Z.
 Proof.
-rewrite -(negbK (_ == _)) -implybE /prod_coef => H.
-apply/implyP => H0.
-rewrite (big_rem _ H) /= H0 !PoszM mulrCA; apply dvdz_mulr.
+rewrite -(negbK (_ == _)) -implybE /prod_coef => H; apply/implyP => H0.
+rewrite (big_rem _ H) /= H0 !PoszM mulrCA; apply: dvdz_mulr.
 by rewrite dvdzE absz_id dvdnn.
 Qed.
 
 Lemma prod_mod_cm f : f \in fs_mod1 -> (f.1.1.+1 %| prod_mod%:Z)%Z.
 Proof.
-move => Hf.
-rewrite /prod_mod (eq_big_perm _ (perm_to_rem Hf)) /= big_cons PoszM mulrC.
-by apply dvdz_mull.
+move=> Hf.
+rewrite /prod_mod (perm_big _ (perm_to_rem Hf)) /= big_cons PoszM mulrC.
+exact: dvdz_mull.
 Qed.
 
 Lemma fs_leq_correct x I :
@@ -335,12 +333,12 @@ Lemma fs_leq_correct x I :
        (fs_leq1 true)].
 Proof.
 rewrite /fs_leq0 /fs_leq1 !(all_pmap, all_map) -!all_predI.
-apply eq_in_all => -[/= n t] Hf.
+apply/eq_in_all => -[/= n t] Hf.
 rewrite -(vsubmxK t) tr_col_mx (mxE col_mx_key);
   case: splitP => // j _;
   rewrite ord1 {j} vsubmxK mul_row_col 2!mxE big_ord1 3!mxE lshift0.
 by (case: (ltrgtP (t 0 0) 0)%R (prod_coef_cml Hf);
-      last by move => -> _ /=; rewrite mul0r add0r andbT);
+      last by move=> -> _ /=; rewrite mul0r add0r andbT);
   rewrite dvdz_eq => /= H /eqP H0;
   rewrite ?andbT linearZ /= -scalemxAl (mxE scalemx_key) -mulrDr
           -1?[RHS](ler_nmul2l H) -1?[RHS](ler_pmul2l H) mulrA mulrN
@@ -361,13 +359,13 @@ Proof.
 rewrite /fs_mod0 /fs_mod1 /= !(all_pmap, all_filter, all_map)
         prednK ?prod_coef_gt0 //
         add0r trmx0 mul0mx mxE addr0 dvdz_mulr ?dvdzz //= -all_predI.
-apply eq_in_all => /= -[[d n] t] Hf /=.
+apply/eq_in_all => /= -[[d n] t] Hf /=.
 rewrite -{1}(vsubmxK t) tr_col_mx mul_row_col 2!mxE big_ord1 3!mxE lshift0.
-case_eq (t 0%R 0%R == 0%R) => H; rewrite H /=;
-  first by rewrite andbT (eqP H) mul0r add0r.
+case: (altP (t 0%R 0%R =P 0%R)) => H /=;
+  first by rewrite andbT H mul0r add0r.
 move: (prod_coef_cmm Hf) prod_coef_gt0.
-rewrite H /= => /dvdzP [prod_coef' H0] /lt0n_neq0.
-rewrite -eqz_nat H0 mulzK ?H // mulf_eq0 H /= orbF => H1.
+rewrite (negbTE H) /= => /dvdzP [prod_coef' H0] /lt0n_neq0.
+rewrite -eqz_nat H0 mulzK // mulf_eq0 (negbTE H) /= orbF => H1.
 by rewrite prednK ?ltz_nat ?muln_gt0 /= ?absz_gt0 //
            linearZ /= -scalemxAl (mxE scalemx_key) -mulrA (mulrC n) -!mulrDr
            [RHS]dvdzE PoszM abszM /(`|Posz `|_| |) -abszM -dvdzE
@@ -379,7 +377,7 @@ Lemma exists_conj_elim_mod_correct (x : int) t (I : 'cV_dim) :
   all (fun f : nat * int_Ring * 'cV_dim =>
          (f.1.1.+1 %| (f.1.2 + x + ((f.2 + t)^T *m I) 0 0)%R)%Z)
       fs_mod1.
-Proof. by rewrite QFLIA_conj_all all_map; apply (eq_in_all (s := fs_mod1)). Qed.
+Proof. rewrite QFLIA_conj_all all_map; exact/eq_in_all. Qed.
 
 Lemma exists_conj_elimP I :
   reflect
@@ -393,11 +391,12 @@ set bs := fun fl => [seq (true, f.1 + (f.2^T *m I) 0 0)%R | f <- fs_leq1 fl].
 set P := fun x => all
   (fun f => f.1.1.+1 %| (f.1.2 + x + (f.2^T *m I) 0 0)%R)%Z fs_mod1.
 have H_prodm : (0 < prod_mod%:Z)%R by rewrite ltz_nat prodn_gt0.
-have H_periodm x : P x = P (prod_mod%:Z + x)%R
-  by apply eq_in_all => /= f Hf; rewrite !dvdzE'; congr eq_op; apply/esym/eqP;
-     rewrite eqz_mod_dvd addrCA -2!(addrA prod_mod%:Z%Z) subrr addr0;
-     apply prod_mod_cm.
-move: (periodic_qe_principle int_archi (bs true) (bs false) H_prodm H_periodm).
+have H_periodm x : P (prod_mod%:Z + x)%R = P x by
+  apply/eq_in_all => /= f Hf; rewrite !dvdzE'; congr eq_op; apply/eqP;
+  rewrite eqz_mod_dvd addrCA -2!(addrA prod_mod%:Z%Z) subrr addr0;
+  exact: prod_mod_cm.
+move: (periodic_qe_principle
+         (int_archi H_prodm) H_periodm (bs true) (bs false)).
 set F1 := exists x : int, _.
 set F2 := exists x : int, _.
 have: F1 <->
@@ -406,32 +405,31 @@ have: F1 <->
          [seq (QFLIA_divisible f.1.1 f.1.2 f.2)  | f <- fs_mod0])
       /\ F2
   by subst F1 F2 bs P; split;
-    [case => x H; split; last exists (prod_coef%:Z * x)%R; move: H |
-     case => H0 [x' H];
+    [case=> x H; split; last exists (prod_coef%:Z * x)%R; move: H |
+     case=> H0 [x' H];
      (have/dvdzP [x]: (prod_coef %| x')%Z
         by move/and3P: H => [_ _] /= /andP [H _]; move: H;
            rewrite add0r trmx0 mul0mx mxE addr0; congr dvdz;
            move: prod_coef_gt0; case: prod_coef);
      rewrite mulrC => Hx'; subst x'; exists x; move: H0 H];
   rewrite !all_cat fs_leq_correct fs_mod_correct;
-  [by move => /andP [] /and3P [] -> _ _ /andP [] |
-   move => /andP [] /and3P [_ H H0] /andP [_ H1] |
-   move => /andP [-> ->] /and3P [H H0 H1]; rewrite !andTb -andbA];
+  [by move=> /andP [] /and3P [] -> _ _ /andP [] |
+   move=> /andP [] /and3P [_ H H0] /andP [_ H1] |
+   move=> /andP [-> ->] /and3P [H H0 H1]; rewrite !andTb -andbA];
   move/and3P: (And3 H0 H H1); congr [&& _, _ & _];
-  rewrite ?all_map; apply eq_in_all => f Hf //=; rewrite mulrCA mulrA.
-move => H H0.
+  rewrite ?all_map; apply/eq_in_all => f Hf //=; rewrite mulrCA mulrA.
+move=> H H0.
 move: {H H0} (iff_trans H (and_iff_compat_l _ H0)) => H1.
 apply: (equivP _ (iff_sym H1)) => {H1}; subst F1 F2.
 rewrite /exists_conj_elim' /= QFLIA_conj_all !all_cat !all_map.
 Opaque fs_leq0 fs_leq1 fs_mod0 fs_mod1.
-apply (iffP andP) => -[H0 H]; (split; first apply H0);
-  move: {H0} H; rewrite /bs /nilp !size_map -!/(nilp _) orbC;
-  case: ifP => _.
+apply/(iffP andP) => -[H0 H]; (split; first apply: H0);
+  move: {H0} H; rewrite /bs /nilp !size_map -!/(nilp _) orbC; case: ifP => _.
 - rewrite QFLIA_disj_has has_map => /hasP [i].
   rewrite mem_iota /= add0n exists_conj_elim_mod_correct /= => H H0.
   by exists i; apply/allP => /= f /(allP H0) /=; rewrite addr0.
 - rewrite QFLIA_conj_all => /all_allpairsP /= H lb ub.
-  move => /mapP [/= j Hj -> {lb}] /mapP [/= i Hi -> {ub}].
+  move=> /mapP [/= j Hj -> {lb}] /mapP [/= i Hi -> {ub}].
   move: (H i j Hi Hj); rewrite QFLIA_disj_has has_map => /hasP [/= k].
   rewrite mem_iota /= add0n exists_conj_elim_mod_correct => H0 /andP [H1 H2].
   exists (j.1 + (j.2^T *m I) 0 0 + k)%R; move: H1.
@@ -441,37 +439,37 @@ apply (iffP andP) => -[H0 H]; (split; first apply H0);
           subr_ge0 => -> /=.
   apply/allP => /= f; move/(allP H2); congr dvdz.
   by rewrite linearD /= mulmxDl mxE (addrAC j.1) !addrA addrAC.
-- case => x Hx; rewrite QFLIA_disj_has has_map; apply/hasP.
+- case=> x Hx; rewrite QFLIA_disj_has has_map; apply/hasP.
   exists `|x %% prod_mod|%Z => /=.
-  + rewrite mem_iota /= add0n -ltz_nat gez0_abs; first by apply ltz_pmod.
-    by apply modz_ge0; rewrite eqz_nat; apply lt0n_neq0.
+  + rewrite mem_iota /= add0n -ltz_nat gez0_abs; first exact: ltz_pmod.
+    apply: modz_ge0; rewrite eqz_nat; exact: lt0n_neq0.
   + rewrite exists_conj_elim_mod_correct gez0_abs;
-      last by apply modz_ge0; rewrite eqz_nat; apply lt0n_neq0.
+      last by apply: modz_ge0; rewrite eqz_nat; exact: lt0n_neq0.
     apply/allP => /= f Hf; move: (allP Hx _ Hf).
     rewrite addr0 !dvdzE'; congr eq_op; apply/eqP.
     rewrite eqz_mod_dvd !(addrC f.1.2) -!(addrA _ f.1.2)
             opprD addrA (addrAC x) -addrA subrr addr0 -eqz_mod_dvd modz_dvdm //.
-    by apply prod_mod_cm.
-- move => H; rewrite QFLIA_conj_all; apply/all_allpairsP => /= i j Hi Hj.
+    exact: prod_mod_cm.
+- move=> H; rewrite QFLIA_conj_all; apply/all_allpairsP => /= i j Hi Hj.
   case: {H} (H _ _ (map_f _ Hj) (map_f _ Hi)) => x /and3P [/= H H0 H1].
   rewrite QFLIA_disj_has has_map; apply/hasP.
   exists `|(x - (j.1 + (j.2^T *m I) 0%R 0%R))%R %% prod_mod|%Z;
     last (rewrite /= gez0_abs ?modz_ge0 // ?eqz_nat ?lt0n_neq0 //;
-          apply/andP; split => /=).
+          apply/andP; split=> /=).
   + by rewrite mem_iota /= add0n -ltz_nat gez0_abs ?ltz_pmod //;
-       apply modz_ge0; rewrite eqz_nat; apply lt0n_neq0.
+       apply: modz_ge0; rewrite eqz_nat; exact: lt0n_neq0.
   + rewrite linearD linearN /= mulmxDl mulNmx (mxE addmx_key) (mxE oppmx_key).
     rewrite addrA 3!(addrAC _ (- _)%R) -2!addrA -!opprD subr_ge0.
-    apply: (ler_trans _ H0).
+    apply: (le_trans _ H0).
     rewrite -subr_ge0 addrA (opprD (_ + _)%R) addrA subr_ge0.
-    by apply ler_mod => //; rewrite subr_ge0.
+    by apply: ler_mod => //; rewrite subr_ge0.
   + rewrite exists_conj_elim_mod_correct;
       apply/allP => /= f Hf; move: (allP H1 _ Hf);
       rewrite !dvdzE'; congr eq_op; apply/eqP.
     rewrite addrAC linearD /= mulmxDl (mxE addmx_key) addrA
             (addrAC f.1.2 (_ + _)%R) -(addrA (f.1.2 + _)%R) eqz_modDl
             eqz_mod_dvd (addrAC j.1) opprD addrA -eqz_mod_dvd modz_dvdm //.
-    by apply prod_mod_cm.
+    exact: prod_mod_cm.
 Transparent fs_leq0 fs_leq1 fs_mod0 fs_mod1.
 Qed.
 
@@ -496,19 +494,17 @@ Lemma exists_DNF_elimP dim I (lss : seq (seq (QFLIA_af (1 + dim)))) :
              has (all (QFLIA_interpret_af (col_mx (const_mx x) I))) lss)
           (QFLIA_interpret_formula I (exists_DNF_elim lss)).
 Proof.
-rewrite /exists_DNF_elim QFLIA_disj_has.
-apply (iffP hasP).
-- case => /= ls' /mapP [] /= ls H -> {ls'} /exists_conj_elimP [] x.
+rewrite /exists_DNF_elim QFLIA_disj_has; apply/(iffP hasP).
+- case=> /= ls' /mapP [] /= ls H -> {ls'} /exists_conj_elimP [] x.
   rewrite all_cat !all_map !all_pmap -all_predI => H0.
   exists x; apply/hasP => /=; exists ls => //.
-  by apply/allP => l /(allP H0) => /=; case: l => //= n t; rewrite andbT.
-- case => x /hasP [] /= ls H H0.
-  exists (exists_conj_elim ls).
-  + by apply map_f.
-  + apply/exists_conj_elimP; exists x.
-    by rewrite all_cat !all_map !all_pmap -all_predI;
-       apply/allP => l /(allP H0);
-       case: l => //= n t; rewrite andbT.
+  by apply/allP => -[? ?|? ? ?] /(allP H0); rewrite //= andbT.
+- case=> x /hasP [] /= ls H H0.
+  exists (exists_conj_elim ls); first exact: map_f.
+  apply/exists_conj_elimP; exists x.
+  by rewrite all_cat !all_map !all_pmap -all_predI;
+     apply/allP => l /(allP H0);
+     case: l => //= n t; rewrite andbT.
 Qed.
 
 Fixpoint Presburger_algorithm dim (f : LIA_formula dim) : QFLIA_formula dim :=
@@ -531,23 +527,22 @@ Lemma Presburger_algorithmP dim I (f : LIA_formula dim) :
   reflect (interpret_formula f I)
           (QFLIA_interpret_formula I (Presburger_algorithm f)).
 Proof.
-move: dim f I.
-refine (LIA_formula_rect _ _ _ _ _ _) => //= dim.
-- move => f IH I; apply/(iffP idP).
+elim/LIA_formula_rect: dim / f I => /= dim.
+- move=> f IH I; apply/(iffP idP).
   + move/exists_DNF_elimP => H x; apply/IH/negP => /negP.
-    by move: (QFLIA_NF_correctness false (col_mx (const_mx x) I)
-                                   (QFLIA_neg (Presburger_algorithm f)))
-      => /= -> H0; apply H; exists x.
-  + move => H; apply/negP => /exists_DNF_elimP [x].
-    by move: (QFLIA_NF_correctness false (col_mx (const_mx x) I)
-                                   (QFLIA_neg (Presburger_algorithm f)))
-      => /= <-; move/negP; apply; apply/IH/H.
-- by move => f IH I; apply (iffP (exists_DNF_elimP _ _));
-     move => [x H]; exists x; move: H;
+    rewrite [~~_](QFLIA_NF_correctness false (col_mx (const_mx x) I)
+                                       (QFLIA_neg (Presburger_algorithm f))).
+    by move=> ?; apply: H; exists x.
+  + move=> H; apply/negP => /exists_DNF_elimP [x].
+    rewrite -[has _ _](QFLIA_NF_correctness
+                         false (col_mx (const_mx x) I)
+                         (QFLIA_neg (Presburger_algorithm f))).
+    move=> /= /negP; apply; exact/IH.
+- by move=> f IH I; apply/(iffP (exists_DNF_elimP _ _));
+     move=> [x H]; exists x; move: H;
      rewrite /QFLIA_DNF -(QFLIA_NF_correctness false) => /IH.
-- by move => f IH I; apply/(iffP idP); move/IH.
-- by move => f1 IH1 f2 IH2 I; apply/(iffP andP); case => /IH1 H /IH2 H0.
-- by move => f1 IH1 f2 IH2 I; apply/(iffP orP);
-    (case; [move/IH1; left | move/IH2; right]).
-- by move => n t I; apply idP.
+- by move=> f IH I; apply/(iffP idP); move/IH.
+- by move=> f1 IH1 f2 IH2 I; apply/(iffP andP); case=> /IH1 H /IH2 H0.
+- move=> f1 IH1 f2 IH2 I; apply/(iffP orP)=> -[/IH1|/IH2]; tauto.
+- move=> ? ? ?; exact/idP.
 Qed.

@@ -27,8 +27,8 @@ Lemma next_correct (m1 m2 : marking) a :
 Proof.
 rewrite /next /step; case: ifP; rewrite eqE /= => /forallP H.
 - suff ->: forall (f1 f2 : marking), (f1 == f2) = [forall i, f1 i == f2 i]
-    by apply eq_forallb => /= i; rewrite ffunE -(gez0_abs (H i)).
-  move => f1 f2; apply Bool.eq_iff_eq_true; split.
+    by apply/eq_forallb => /= i; rewrite ffunE -(gez0_abs (H i)).
+  move=> f1 f2; apply/Bool.eq_iff_eq_true; split.
   + by move/eqP/ffunP => H0; apply/forallP => i; rewrite H0.
   + by move/forallP => H0; apply/eqP/ffunP => i; rewrite (eqP (H0 i)).
 - by apply/esym/forallP => /= H0; apply: H => i; rewrite (eqP (H0 i)).

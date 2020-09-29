@@ -1,3 +1,13 @@
--R ~/src/coq/regular/ regular
--R /usr/local/coq8.5pl2/mathcomp-1.6/mathcomp mathcomp
+VASs.v
+algebra_ext.v
+bigop_ext.v
+cone.v
+logic/LRA.v
+logic/Presburger.v
+matrix_ext.v
+utils.v
+
 -R . vass
+
+-arg -w -arg -notation-overridden
+-arg -w -arg -ambiguous-paths

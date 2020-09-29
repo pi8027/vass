@@ -1,64 +1,39 @@
-From mathcomp Require Import all_ssreflect all_fingroup all_algebra zmodp.
-Import GroupScope GRing.Theory Num.Theory.
+From mathcomp Require Import all_ssreflect.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-(*
-Lemma split_lshift (m n : nat) (i : 'I_m) : split (lshift n i) = inl i.
-Proof. by apply: unsplitK (inl i). Qed.
-
-Lemma split_rshift (m n : nat) (i : 'I_n) : split (rshift m i) = inr i.
-Proof. by apply: unsplitK (inr i). Qed.
-*)
-
 Lemma lshift_inj (m n : nat) : injective (@lshift m n).
-Proof. by move => x y /(f_equal val) /= /val_inj. Qed.
+Proof. by move=> x y /(f_equal val) /= /val_inj. Qed.
 
 Lemma rshift_inj (m n : nat) : injective (@rshift m n).
-Proof. by move => x y /(f_equal val) /= /addnI /val_inj. Qed.
+Proof. by move=> x y /(f_equal val) /addnI /val_inj. Qed.
 
-Lemma lshift_rshift_neq (m n : nat) i j : lshift m i <> rshift n j.
-Proof. by apply/eqP; rewrite eqE /= neq_ltn (ltn_addr _ (ltn_ord i)). Qed.
+Lemma lshift_rshift_neq (m n : nat) i j : lshift m i != rshift n j.
+Proof. by rewrite eqE /= neq_ltn ltn_addr. Qed.
 
-Lemma rshift_lshift_neq (m n : nat) i j : rshift n j <> lshift m i.
-Proof. by move/esym/lshift_rshift_neq. Qed.
+Lemma rshift_lshift_neq (m n : nat) i j : rshift n j != lshift m i.
+Proof. by rewrite eq_sym; exact: lshift_rshift_neq. Qed.
 
 Lemma enum_rank_in_inj
-      (T : finType) (x y : T) (A : pred T) (H : x \in A) (H0 : y \in A) :
-  enum_rank_in H x = enum_rank_in H0 y -> x = y.
-Proof. move/(congr1 enum_val); by do 2 rewrite enum_rankK_in //. Qed.
+      (T : finType) (x0 y0 : T) A (Ax0 : x0 \in A) (Ay0 : y0 \in A) :
+  {in A &, forall x y, enum_rank_in Ax0 x = enum_rank_in Ay0 y -> x = y}.
+Proof. by move=> x y xA yA /(congr1 enum_val); rewrite !enum_rankK_in. Qed.
 
-Lemma all_allpairsP (S T : eqType) (R : Type)
-                    (g : pred R) (f : S -> T -> R) (s : seq S) (t : seq T) :
-  reflect (forall (i : S) (j : T), i \in s -> j \in t -> g (f i j))
-          (all g [seq f i j | i <- s, j <- t]).
+Lemma all_allpairsP
+      (S : eqType) (T : S -> eqType) (R : Type)
+      (g : pred R) (f : forall i : S, T i -> R)
+      (s : seq S) (t : forall i : S, seq (T i)) :
+  reflect (forall (i : S) (j : T i), i \in s -> j \in t i -> g (f i j))
+          (all g [seq f i j | i <- s, j <- t i]).
 Proof.
-apply (iffP idP); elim: s t => // s ss IHs; elim => [| t ts IHt] //=.
-- rewrite /= all_cat => /and3P [H H0 H1] x y /=.
-  rewrite !inE => /orP [/eqP -> | H2] /orP [/eqP -> | H3] //;
-    try (apply IHt => //; last by rewrite ?(inE, eqxx) ?H2 ?orbT);
-    try by (apply (IHs (t :: ts)) => //; rewrite ?(inE, eqxx)).
-  + rewrite /= all_cat H0 /=.
-    elim: ss H1 {IHs IHt} => //= s' ss IHs /andP [H4].
-    by rewrite !all_cat => /andP [-> H5] /=; apply IHs.
-  + rewrite /= all_cat H0 /=.
-    elim: ss H1 {IHs IHt H2} => //= s' ss IHs /andP [H4].
-    by rewrite !all_cat => /andP [-> H5] /=; apply IHs.
-- by move => {IHs} _; elim: ss.
-- move => H; apply/andP; split; first by apply H; rewrite inE eqxx.
-  rewrite all_cat; apply/andP; split.
-Abort.
-
-Lemma all_allpairsP (S T R : eqType)
-                    (g : pred R) (f : S -> T -> R) (s : seq S) (t : seq T) :
-  reflect (forall (i : S) (j : T), i \in s -> j \in t -> g (f i j))
-          (all g [seq f i j | i <- s, j <- t]).
-Proof.
-apply (iffP allP).
-- by move => H i j H0 H1; apply/H/allpairsP; exists (i, j).
-- by move => H x /allpairsP [] [i j] [] /= H0 H1 ->; apply H.
+elim: s => [|x s IHs]; first by constructor.
+rewrite /= all_cat all_map /preim.
+apply/(iffP andP)=> [[/allP /= ? ? x' y x'_in_xs]|p_xs_t].
+  by move: x'_in_xs y; rewrite inE => /predU1P [-> //|? ?]; exact: IHs.
+split; first by apply/allP => ?; exact/p_xs_t/mem_head.
+by apply/IHs => x' y x'_in_s; apply: p_xs_t; rewrite inE x'_in_s orbT.
 Qed.
 
 Lemma all_pmap S T (p : pred T) (f : S -> option T) xs :
@@ -71,7 +46,5 @@ Proof. by elim: xs => //= x xs <-; case: (q x). Qed.
 
 Lemma all_enum (T : finType) (P : pred T) : all P (enum T) = [forall i, P i].
 Proof.
-apply/idP; case: ifP; first by move/forallP => H; apply/allP.
-by move/negP => H /allP H0; apply: H;
-  apply/forallP => x; apply: H0; rewrite mem_enum.
+apply/allP/forallP => H x; move: (H x); rewrite mem_enum inE //; exact.
 Qed.
